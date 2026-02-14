@@ -116,6 +116,63 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        {/* Legal & Info */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Legal & Information</Text>
+          
+          <TouchableOpacity
+            style={styles.card}
+            onPress={() => router.push('/privacy-policy')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.infoRow}>
+              <View style={[styles.iconContainer, { backgroundColor: colors.info + '20' }]}>
+                <IconSymbol
+                  ios_icon_name="lock.shield"
+                  android_material_icon_name="privacy-tip"
+                  size={24}
+                  color={colors.info}
+                />
+              </View>
+              <View style={styles.infoContent}>
+                <Text style={styles.infoValue}>Privacy Policy</Text>
+              </View>
+              <IconSymbol
+                ios_icon_name="chevron.right"
+                android_material_icon_name="chevron-right"
+                size={20}
+                color={colors.textSecondary}
+              />
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.card}
+            onPress={() => router.push('/terms-of-service')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.infoRow}>
+              <View style={[styles.iconContainer, { backgroundColor: colors.warning + '20' }]}>
+                <IconSymbol
+                  ios_icon_name="doc.text"
+                  android_material_icon_name="description"
+                  size={24}
+                  color={colors.warning}
+                />
+              </View>
+              <View style={styles.infoContent}>
+                <Text style={styles.infoValue}>Terms of Service</Text>
+              </View>
+              <IconSymbol
+                ios_icon_name="chevron.right"
+                android_material_icon_name="chevron-right"
+                size={20}
+                color={colors.textSecondary}
+              />
+            </View>
+          </TouchableOpacity>
+        </View>
+
         {/* App Info */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>About</Text>

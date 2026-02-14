@@ -35,15 +35,12 @@ function RootLayoutNav() {
     const inAuthGroup = segments[0] === "auth" || segments[0] === "auth-popup" || segments[0] === "auth-callback";
 
     if (!user && !inAuthGroup) {
-      // Redirect to auth if not authenticated
       router.replace("/auth");
     } else if (user && inAuthGroup) {
-      // Redirect to app if authenticated
       router.replace("/(tabs)/(home)");
     }
   }, [user, loading, segments]);
 
-  // Show loading screen while checking authentication
   if (loading) {
     return (
       <View style={authLoadingStyles.container}>
@@ -67,6 +64,9 @@ function RootLayoutNav() {
       <Stack.Screen name="nutrition/[id]" options={{ presentation: "modal", title: "Nutrition Plan" }} />
       <Stack.Screen name="readiness/[id]" options={{ presentation: "modal", title: "Readiness Score" }} />
       <Stack.Screen name="session/[id]" options={{ presentation: "modal", title: "Session Details" }} />
+      <Stack.Screen name="privacy-policy" options={{ presentation: "modal", title: "Privacy Policy" }} />
+      <Stack.Screen name="terms-of-service" options={{ presentation: "modal", title: "Terms of Service" }} />
+      <Stack.Screen name="+not-found" />
     </Stack>
   );
 }

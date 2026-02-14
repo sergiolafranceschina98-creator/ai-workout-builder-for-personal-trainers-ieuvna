@@ -32,7 +32,7 @@ export default function ProfileScreen() {
         <View style={styles.centerContent}>
           <View style={styles.emptyIconContainer}>
             <IconSymbol
-              ios_icon_name="person.fill"
+              ios_icon_name="person"
               android_material_icon_name="person"
               size={64}
               color={colors.textTertiary}
@@ -83,7 +83,7 @@ export default function ProfileScreen() {
             <View style={styles.infoRow}>
               <View style={[styles.iconContainer, { backgroundColor: colors.primary + '20' }]}>
                 <IconSymbol
-                  ios_icon_name="person.fill"
+                  ios_icon_name="person"
                   android_material_icon_name="person"
                   size={24}
                   color={colors.primary}
@@ -100,7 +100,7 @@ export default function ProfileScreen() {
             <View style={styles.infoRow}>
               <View style={[styles.iconContainer, { backgroundColor: colors.success + '20' }]}>
                 <IconSymbol
-                  ios_icon_name="envelope.fill"
+                  ios_icon_name="email"
                   android_material_icon_name="email"
                   size={24}
                   color={colors.success}
@@ -116,6 +116,63 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        {/* Legal & Info */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Legal & Information</Text>
+          
+          <TouchableOpacity
+            style={styles.card}
+            onPress={() => router.push('/privacy-policy')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.infoRow}>
+              <View style={[styles.iconContainer, { backgroundColor: colors.info + '20' }]}>
+                <IconSymbol
+                  ios_icon_name="lock.shield"
+                  android_material_icon_name="privacy-tip"
+                  size={24}
+                  color={colors.info}
+                />
+              </View>
+              <View style={styles.infoContent}>
+                <Text style={styles.infoValue}>Privacy Policy</Text>
+              </View>
+              <IconSymbol
+                ios_icon_name="chevron.right"
+                android_material_icon_name="chevron-right"
+                size={20}
+                color={colors.textSecondary}
+              />
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.card}
+            onPress={() => router.push('/terms-of-service')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.infoRow}>
+              <View style={[styles.iconContainer, { backgroundColor: colors.warning + '20' }]}>
+                <IconSymbol
+                  ios_icon_name="doc.text"
+                  android_material_icon_name="description"
+                  size={24}
+                  color={colors.warning}
+                />
+              </View>
+              <View style={styles.infoContent}>
+                <Text style={styles.infoValue}>Terms of Service</Text>
+              </View>
+              <IconSymbol
+                ios_icon_name="chevron.right"
+                android_material_icon_name="chevron-right"
+                size={20}
+                color={colors.textSecondary}
+              />
+            </View>
+          </TouchableOpacity>
+        </View>
+
         {/* App Info */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>About</Text>
@@ -123,7 +180,7 @@ export default function ProfileScreen() {
             <View style={styles.infoRow}>
               <View style={[styles.iconContainer, { backgroundColor: colors.info + '20' }]}>
                 <IconSymbol
-                  ios_icon_name="info.circle.fill"
+                  ios_icon_name="info"
                   android_material_icon_name="info"
                   size={24}
                   color={colors.info}
@@ -140,7 +197,7 @@ export default function ProfileScreen() {
             <View style={styles.infoRow}>
               <View style={[styles.iconContainer, { backgroundColor: colors.warning + '20' }]}>
                 <IconSymbol
-                  ios_icon_name="figure.strengthtraining.traditional"
+                  ios_icon_name="fitness-center"
                   android_material_icon_name="fitness-center"
                   size={24}
                   color={colors.warning}
@@ -161,7 +218,7 @@ export default function ProfileScreen() {
           activeOpacity={0.7}
         >
           <IconSymbol
-            ios_icon_name="arrow.right.square.fill"
+            ios_icon_name="exit-to-app"
             android_material_icon_name="exit-to-app"
             size={20}
             color="#FFFFFF"
@@ -181,7 +238,7 @@ export default function ProfileScreen() {
           <View style={styles.modalContent}>
             <View style={[styles.modalIconContainer, { backgroundColor: colors.warning + '20' }]}>
               <IconSymbol
-                ios_icon_name="exclamationmark.triangle.fill"
+                ios_icon_name="warning"
                 android_material_icon_name="warning"
                 size={48}
                 color={colors.warning}
@@ -222,7 +279,7 @@ export default function ProfileScreen() {
           <View style={styles.modalContent}>
             <View style={[styles.modalIconContainer, { backgroundColor: colors.error + '20' }]}>
               <IconSymbol
-                ios_icon_name="exclamationmark.circle.fill"
+                ios_icon_name="error"
                 android_material_icon_name="error"
                 size={48}
                 color={colors.error}
