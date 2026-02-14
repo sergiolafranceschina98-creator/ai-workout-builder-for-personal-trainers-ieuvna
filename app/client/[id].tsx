@@ -343,6 +343,82 @@ export default function ClientDetailScreen() {
             )}
           </View>
 
+          <View style={styles.actionButtons}>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => {
+                console.log('User tapped Edit Profile button');
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                router.push(`/edit-client/${id}`);
+              }}
+              activeOpacity={0.7}
+            >
+              <IconSymbol
+                ios_icon_name="pencil"
+                android_material_icon_name="edit"
+                size={20}
+                color="#FFFFFF"
+              />
+              <Text style={styles.actionButtonText}>Edit Profile</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => {
+                console.log('User tapped Track Progress button');
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                router.push(`/track-progress/${id}`);
+              }}
+              activeOpacity={0.7}
+            >
+              <IconSymbol
+                ios_icon_name="chart.bar.fill"
+                android_material_icon_name="show-chart"
+                size={20}
+                color="#FFFFFF"
+              />
+              <Text style={styles.actionButtonText}>Track Progress</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.actionButtons}>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => {
+                console.log('User tapped Nutrition button');
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                router.push(`/nutrition/${id}`);
+              }}
+              activeOpacity={0.7}
+            >
+              <IconSymbol
+                ios_icon_name="leaf.fill"
+                android_material_icon_name="restaurant"
+                size={20}
+                color="#FFFFFF"
+              />
+              <Text style={styles.actionButtonText}>Nutrition</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => {
+                console.log('User tapped Readiness button');
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                router.push(`/readiness/${id}`);
+              }}
+              activeOpacity={0.7}
+            >
+              <IconSymbol
+                ios_icon_name="heart.fill"
+                android_material_icon_name="favorite"
+                size={20}
+                color="#FFFFFF"
+              />
+              <Text style={styles.actionButtonText}>Readiness</Text>
+            </TouchableOpacity>
+          </View>
+
           <TouchableOpacity
             style={[styles.generateButton, generating && styles.generateButtonDisabled]}
             onPress={handleGenerateProgram}
@@ -547,6 +623,27 @@ const styles = StyleSheet.create({
   },
   programMeta: {
     fontSize: 14,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginHorizontal: 16,
+    marginTop: 8,
+  },
+  actionButton: {
+    flex: 1,
+    backgroundColor: colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 8,
+    gap: 6,
+  },
+  actionButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
   },
   generateButton: {
     backgroundColor: colors.primary,

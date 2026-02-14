@@ -7,11 +7,13 @@ import {
   ScrollView,
   ActivityIndicator,
   TouchableOpacity,
+  Modal,
 } from 'react-native';
 import { useTheme } from '@react-navigation/native';
 import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
 import { IconSymbol } from '@/components/IconSymbol';
 import { colors } from '@/styles/commonStyles';
+import * as Haptics from 'expo-haptics';
 
 interface Exercise {
   name: string;
@@ -38,6 +40,15 @@ interface Program {
   weeksDuration: number;
   split: string;
   weeks: Week[];
+  clientId?: string;
+}
+
+interface ExerciseAlternative {
+  name: string;
+  muscleGroup: string;
+  equipment: string;
+  difficulty: string;
+  reason: string;
 }
 
 export default function ProgramDetailScreen() {
@@ -46,6 +57,10 @@ export default function ProgramDetailScreen() {
   const { id } = useLocalSearchParams();
   const [program, setProgram] = useState<Program | null>(null);
   const [loading, setLoading] = useState(true);
+  const [swapModalVisible, setSwapModalVisible] = useState(false);
+  const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
+  const [alternatives, setAlternatives] = useState<ExerciseAlternative[]>([]);
+  const [loadingAlternatives, setLoadingAlternatives] = useState(false);
 
   useEffect(() => {
     fetchProgramDetails();
@@ -64,6 +79,7 @@ export default function ProgramDetailScreen() {
         weeksDuration: data.weeksDuration,
         split: data.split,
         weeks: data.programData?.weeks || [],
+        clientId: data.clientId,
       };
       
       setProgram(transformedProgram);
@@ -72,6 +88,40 @@ export default function ProgramDetailScreen() {
       console.error('Error fetching program details:', error);
       setProgram(null);
       setLoading(false);
+    }
+  };
+
+  const handleSwapExercise = async (exercise: Exercise) => {
+    console.log('User tapped Swap Exercise button for:', exercise.name);
+    setSelectedExercise(exercise);
+    setSwapModalVisible(true);
+    setLoadingAlternatives(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    try {
+      const { authenticatedPost } = await import('@/utils/api');
+
+      const swapRequest = {
+        originalExerciseName: exercise.name,
+        clientId: program?.clientId || '',
+        muscleGroup: '',
+        equipment: '',
+        injuries: '',
+      };
+
+      console.log('[ProgramDetail] Requesting exercise alternatives:', swapRequest);
+
+      // TODO: Backend Integration - POST /api/exercises/swap with { originalExerciseName, clientId, muscleGroup?, equipment?, injuries? } → { alternatives: [{ name, muscleGroup, equipment, difficulty, reason }] }
+      const result = await authenticatedPost<{ alternatives: ExerciseAlternative[] }>('/api/exercises/swap', swapRequest);
+      console.log('[ProgramDetail] Received alternatives:', result);
+
+      setAlternatives(result.alternatives || []);
+      setLoadingAlternatives(false);
+    } catch (error) {
+      console.error('Error fetching exercise alternatives:', error);
+      setAlternatives([]);
+      setLoadingAlternatives(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
   };
 
@@ -183,9 +233,23 @@ export default function ProgramDetailScreen() {
                             </Text>
                           </View>
                           <View style={styles.exerciseDetails}>
-                            <Text style={[styles.exerciseName, { color: theme.colors.text }]}>
-                              {exercise.name}
-                            </Text>
+                            <View style={styles.exerciseHeader}>
+                              <Text style={[styles.exerciseName, { color: theme.colors.text }]}>
+                                {exercise.name}
+                              </Text>
+                              <TouchableOpacity
+                                style={styles.swapButton}
+                                onPress={() => handleSwapExercise(exercise)}
+                                activeOpacity={0.7}
+                              >
+                                <IconSymbol
+                                  ios_icon_name="arrow.2.squarepath"
+                                  android_material_icon_name="swap-horiz"
+                                  size={18}
+                                  color={colors.primary}
+                                />
+                              </TouchableOpacity>
+                            </View>
                             <View style={styles.exerciseMeta}>
                               <Text style={[styles.exerciseMetaText, { color: colors.textSecondary }]}>
                                 {setsRepsText}
@@ -217,6 +281,127 @@ export default function ProgramDetailScreen() {
             );
           })}
         </ScrollView>
+
+        <Modal
+          visible={swapModalVisible}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setSwapModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: theme.colors.card }]}>
+              <View style={styles.modalHeader}>
+                <View style={styles.modalTitleContainer}>
+                  <IconSymbol
+                    ios_icon_name="arrow.2.squarepath"
+                    android_material_icon_name="swap-horiz"
+                    size={24}
+                    color={colors.primary}
+                  />
+                  <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
+                    Exercise Alternatives
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setSwapModalVisible(false)}
+                  activeOpacity={0.7}
+                >
+                  <IconSymbol
+                    ios_icon_name="xmark"
+                    android_material_icon_name="close"
+                    size={24}
+                    color={theme.colors.text}
+                  />
+                </TouchableOpacity>
+              </View>
+
+              {selectedExercise && (
+                <View style={styles.originalExercise}>
+                  <Text style={[styles.originalLabel, { color: colors.textSecondary }]}>
+                    Original Exercise
+                  </Text>
+                  <Text style={[styles.originalName, { color: theme.colors.text }]}>
+                    {selectedExercise.name}
+                  </Text>
+                </View>
+              )}
+
+              <ScrollView style={styles.alternativesScroll}>
+                {loadingAlternatives ? (
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color={colors.primary} />
+                    <Text style={[styles.loadingText, { color: theme.colors.text }]}>
+                      Finding alternatives...
+                    </Text>
+                  </View>
+                ) : alternatives.length === 0 ? (
+                  <View style={styles.emptyAlternatives}>
+                    <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                      No alternatives found
+                    </Text>
+                  </View>
+                ) : (
+                  alternatives.map((alt, index) => {
+                    const altNumber = index + 1;
+                    
+                    return (
+                      <View key={index} style={[styles.alternativeCard, { backgroundColor: theme.colors.background }]}>
+                        <View style={styles.alternativeHeader}>
+                          <View style={styles.alternativeNumber}>
+                            <Text style={[styles.alternativeNumberText, { color: colors.primary }]}>
+                              {altNumber}
+                            </Text>
+                          </View>
+                          <Text style={[styles.alternativeName, { color: theme.colors.text }]}>
+                            {alt.name}
+                          </Text>
+                        </View>
+                        <View style={styles.alternativeDetails}>
+                          <View style={styles.alternativeTag}>
+                            <IconSymbol
+                              ios_icon_name="figure.strengthtraining.traditional"
+                              android_material_icon_name="fitness-center"
+                              size={14}
+                              color={colors.primary}
+                            />
+                            <Text style={[styles.alternativeTagText, { color: colors.textSecondary }]}>
+                              {alt.muscleGroup}
+                            </Text>
+                          </View>
+                          <View style={styles.alternativeTag}>
+                            <IconSymbol
+                              ios_icon_name="dumbbell.fill"
+                              android_material_icon_name="sports-gymnastics"
+                              size={14}
+                              color={colors.primary}
+                            />
+                            <Text style={[styles.alternativeTagText, { color: colors.textSecondary }]}>
+                              {alt.equipment}
+                            </Text>
+                          </View>
+                          <View style={styles.alternativeTag}>
+                            <IconSymbol
+                              ios_icon_name="chart.bar.fill"
+                              android_material_icon_name="show-chart"
+                              size={14}
+                              color={colors.primary}
+                            />
+                            <Text style={[styles.alternativeTagText, { color: colors.textSecondary }]}>
+                              {alt.difficulty}
+                            </Text>
+                          </View>
+                        </View>
+                        <Text style={[styles.alternativeReason, { color: colors.textSecondary }]}>
+                          {alt.reason}
+                        </Text>
+                      </View>
+                    );
+                  })
+                )}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
       </View>
     </>
   );
@@ -313,10 +498,20 @@ const styles = StyleSheet.create({
   exerciseDetails: {
     flex: 1,
   },
+  exerciseHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
   exerciseName: {
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 4,
+    flex: 1,
+  },
+  swapButton: {
+    padding: 4,
+    marginLeft: 8,
   },
   exerciseMeta: {
     flexDirection: 'row',
@@ -331,5 +526,115 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontStyle: 'italic',
     marginTop: 2,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  originalExercise: {
+    marginBottom: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.textSecondary + '30',
+  },
+  originalLabel: {
+    fontSize: 12,
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+  originalName: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  alternativesScroll: {
+    maxHeight: 500,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+  },
+  emptyAlternatives: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyText: {
+    fontSize: 16,
+  },
+  alternativeCard: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+  },
+  alternativeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 8,
+  },
+  alternativeNumber: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.primary + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  alternativeNumberText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  alternativeName: {
+    fontSize: 16,
+    fontWeight: '600',
+    flex: 1,
+  },
+  alternativeDetails: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 8,
+  },
+  alternativeTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: colors.primary + '10',
+    borderRadius: 12,
+  },
+  alternativeTagText: {
+    fontSize: 12,
+  },
+  alternativeReason: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontStyle: 'italic',
   },
 });

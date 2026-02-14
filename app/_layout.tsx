@@ -6,7 +6,7 @@ import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { SystemBars } from "react-native-edge-to-edge";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { useColorScheme, Alert } from "react-native";
+import { useColorScheme, Alert, View, ActivityIndicator, Text, StyleSheet } from "react-native";
 import { useNetworkState } from "expo-network";
 import {
   DarkTheme,
@@ -43,6 +43,16 @@ function RootLayoutNav() {
     }
   }, [user, loading, segments]);
 
+  // Show loading screen while checking authentication
+  if (loading) {
+    return (
+      <View style={authLoadingStyles.container}>
+        <ActivityIndicator size="large" color="#007AFF" />
+        <Text style={authLoadingStyles.text}>Loading...</Text>
+      </View>
+    );
+  }
+
   return (
     <Stack>
       <Stack.Screen name="auth" options={{ headerShown: false }} />
@@ -52,9 +62,28 @@ function RootLayoutNav() {
       <Stack.Screen name="client/[id]" options={{ presentation: "modal", title: "Client Details" }} />
       <Stack.Screen name="add-client" options={{ presentation: "modal", title: "New Client" }} />
       <Stack.Screen name="program/[id]" options={{ presentation: "modal", title: "Workout Program" }} />
+      <Stack.Screen name="edit-client/[id]" options={{ presentation: "modal", title: "Edit Client" }} />
+      <Stack.Screen name="track-progress/[id]" options={{ presentation: "modal", title: "Track Progress" }} />
+      <Stack.Screen name="nutrition/[id]" options={{ presentation: "modal", title: "Nutrition Plan" }} />
+      <Stack.Screen name="readiness/[id]" options={{ presentation: "modal", title: "Readiness Score" }} />
+      <Stack.Screen name="session/[id]" options={{ presentation: "modal", title: "Session Details" }} />
     </Stack>
   );
 }
+
+const authLoadingStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  text: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#666',
+  },
+});
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
