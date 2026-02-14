@@ -17,6 +17,12 @@ export const app = await createApplication(schema);
 // Export App type for use in route files
 export type App = typeof app;
 
+// Configure extended timeout for AI generation requests (120 seconds = 2 minutes)
+// This is needed for the /api/programs/generate endpoint which can take 30-60 seconds
+app.fastify.server.keepAliveTimeout = 125000; // 125 seconds
+app.fastify.server.requestTimeout = 125000; // 125 seconds
+app.fastify.server.headersTimeout = 130000; // 130 seconds
+
 // Enable authentication with Better Auth
 app.withAuth();
 
@@ -29,4 +35,4 @@ readinessRoutes.register(app, app.fastify);
 exercisesRoutes.register(app, app.fastify);
 
 await app.run();
-app.logger.info('Application running');
+app.logger.info('Application running with 120s AI generation timeout');

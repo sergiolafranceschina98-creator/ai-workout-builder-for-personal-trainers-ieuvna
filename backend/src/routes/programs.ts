@@ -61,16 +61,23 @@ export function register(app: App, fastify: FastifyInstance) {
           201: {
             type: 'object',
             properties: {
-              programId: { type: 'string' },
+              success: { type: 'boolean' },
               program: {
                 type: 'object',
                 properties: {
+                  id: { type: 'string' },
                   weeksDuration: { type: 'number' },
                   split: { type: 'string' },
-                  weeks: { type: 'array' },
-                  exercises: { type: 'array' },
+                  createdAt: { type: 'string' },
                 },
               },
+            },
+          },
+          500: {
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+              error: { type: 'string' },
             },
           },
         },
@@ -85,26 +92,28 @@ export function register(app: App, fastify: FastifyInstance) {
 
       app.logger.info(
         { trainerId, clientId },
-        'Starting AI program generation'
+        'Starting AI program generation request'
       );
 
       try {
-        // Fetch client data
+        // Step 1: Fetch client data
+        app.logger.info({ clientId, trainerId }, 'Step 1: Fetching client data');
         const client = await app.db.query.clients.findFirst({
           where: and(eq(schema.clients.id, clientId), eq(schema.clients.trainerId, trainerId)),
         });
 
         if (!client) {
-          app.logger.warn({ clientId, trainerId }, 'Client not found');
-          return reply.status(404).send({ error: 'Client not found' });
+          app.logger.warn({ clientId, trainerId }, 'Step 1 ERROR: Client not found');
+          return reply.status(404).send({ success: false, error: 'Client not found' });
         }
 
         app.logger.info(
-          { clientId, trainerId, clientName: client.name },
-          'Fetched client data for program generation'
+          { clientId, trainerId, clientName: client.name, age: client.age, gender: client.gender, experience: client.experience },
+          'Step 1 COMPLETE: Client data fetched successfully'
         );
 
-        // Build the system prompt
+        // Step 2: Build prompt
+        app.logger.info({ clientId }, 'Step 2: Building AI prompt');
         const systemPrompt = `You are an expert strength and conditioning coach. Generate a periodized workout program based on:
 - Client: ${client.age} year old ${client.gender}, ${client.experience} level
 - Goals: ${client.goals}
@@ -133,57 +142,104 @@ Return a JSON structure with:
 IMPORTANT: Every exercise MUST have a notes field with helpful coaching cues or form tips.
 Progressive overload should increase across weeks. Avoid exercises conflicting with injuries. Balance volume across muscle groups. Match intensity/volume to experience level.`;
 
+        const userPrompt = `Generate a complete ${client.trainingFrequency} day/week periodized workout program for a ${client.experience} level client who trains ${client.timePerSession} minutes per session with access to ${client.equipment} equipment. Goal: ${client.goals}. Duration: 8-12 weeks with progressive overload. Include detailed coaching notes for each exercise.`;
+
+        app.logger.info({ clientId }, 'Step 2 COMPLETE: Prompt built successfully');
+
+        // Step 3: Call AI with timeout protection
+        app.logger.info({ clientId }, 'Step 3: Calling AI to generate program (this may take 30-60 seconds)');
+        let programData: ProgramData;
+
+        try {
+          const { object } = await generateObject({
+            model: gateway('openai/gpt-5-mini'),
+            schema: ProgramDataSchema,
+            schemaName: 'WorkoutProgram',
+            schemaDescription: 'Complete periodized workout program with progressive overload',
+            system: systemPrompt,
+            prompt: userPrompt,
+          });
+
+          programData = object as ProgramData;
+          app.logger.info(
+            {
+              clientId,
+              weeksDuration: programData.weeksDuration,
+              split: programData.split,
+              exerciseCount: programData.exercises.length,
+            },
+            'Step 3 COMPLETE: AI generated program successfully'
+          );
+        } catch (aiError) {
+          app.logger.error(
+            { err: aiError, clientId, trainerId },
+            'Step 3 ERROR: AI generation failed'
+          );
+          return reply.status(500).send({
+            success: false,
+            error: `AI generation failed: ${aiError instanceof Error ? aiError.message : 'Unknown error'}`,
+          });
+        }
+
+        // Step 4: Save program to database
         app.logger.info(
-          { clientId },
-          'Calling AI to generate program'
+          { clientId, weeks: programData.weeksDuration },
+          'Step 4: Saving program to database'
         );
 
-        // Call AI to generate program
-        const { object } = await generateObject({
-          model: gateway('openai/gpt-5-mini'),
-          schema: ProgramDataSchema,
-          schemaName: 'WorkoutProgram',
-          schemaDescription: 'Complete periodized workout program with progressive overload',
-          system: systemPrompt,
-          prompt: `Generate a complete ${client.trainingFrequency} day/week periodized workout program for a ${client.experience} level client who trains ${client.timePerSession} minutes per session with access to ${client.equipment} equipment. Goal: ${client.goals}. Duration: 8-12 weeks with progressive overload.`,
-        });
+        try {
+          const result = await app.db
+            .insert(schema.workoutPrograms)
+            .values({
+              clientId,
+              trainerId,
+              programData: JSON.stringify(programData),
+              weeksDuration: programData.weeksDuration,
+              split: programData.split,
+            })
+            .returning();
 
-        const programData = object as ProgramData;
+          const createdProgram = result[0];
+          app.logger.info(
+            { programId: createdProgram.id, clientId, trainerId },
+            'Step 4 COMPLETE: Program saved to database'
+          );
 
-        app.logger.info(
-          { clientId, weeksDuration: programData.weeksDuration, split: programData.split },
-          'AI generated program successfully'
-        );
+          // Step 5: Return success response
+          app.logger.info(
+            { clientId, programId: createdProgram.id, trainerId },
+            'FINAL: Returning success response'
+          );
 
-        // Save program to database
-        const result = await app.db
-          .insert(schema.workoutPrograms)
-          .values({
-            clientId,
-            trainerId,
-            programData: JSON.stringify(programData),
-            weeksDuration: programData.weeksDuration,
-            split: programData.split,
-          })
-          .returning();
-
-        const createdProgram = result[0];
-        app.logger.info(
-          { programId: createdProgram.id, clientId, trainerId },
-          'Program saved to database'
-        );
-
-        reply.status(201);
-        return {
-          programId: createdProgram.id,
-          program: programData,
-        };
+          reply.status(201);
+          return {
+            success: true,
+            program: {
+              id: createdProgram.id,
+              weeksDuration: createdProgram.weeksDuration,
+              split: createdProgram.split,
+              createdAt: createdProgram.createdAt,
+            },
+          };
+        } catch (dbError) {
+          app.logger.error(
+            { err: dbError, clientId, trainerId },
+            'Step 4 ERROR: Database save failed'
+          );
+          return reply.status(500).send({
+            success: false,
+            error: `Database save failed: ${dbError instanceof Error ? dbError.message : 'Unknown error'}`,
+          });
+        }
       } catch (error) {
         app.logger.error(
-          { err: error, trainerId, clientId },
-          'Failed to generate program'
+          { err: error, trainerId, clientId, errorMessage: error instanceof Error ? error.message : 'Unknown error' },
+          'FATAL ERROR: Unexpected error in program generation'
         );
-        throw error;
+        return reply.status(500).send({
+          success: false,
+          error: `Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        });
       }
     }
   );
