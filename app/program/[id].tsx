@@ -105,11 +105,19 @@ export default function ProgramDetailScreen() {
       }
       
       // Transform the API response to match the expected Program interface
+      // Backend returns 'week' but frontend expects 'weekNumber'
+      const weeksArray = Array.isArray(programData.weeks) ? programData.weeks : [];
+      const transformedWeeks = weeksArray.map((w: any) => ({
+        weekNumber: w.week || w.weekNumber || 0,
+        phase: w.phase || '',
+        workouts: Array.isArray(w.workouts) ? w.workouts : [],
+      }));
+      
       const transformedProgram: Program = {
         id: data.id,
-        weeksDuration: data.weeksDuration,
-        split: data.split,
-        weeks: Array.isArray(programData.weeks) ? programData.weeks : [],
+        weeksDuration: data.weeksDuration || programData.weeksDuration || 0,
+        split: data.split || programData.split || 'Unknown',
+        weeks: transformedWeeks,
         clientId: data.clientId,
       };
       
@@ -120,6 +128,11 @@ export default function ProgramDetailScreen() {
         weeksCount: transformedProgram.weeks.length,
         hasWorkouts: transformedProgram.weeks.length > 0 && transformedProgram.weeks[0]?.workouts?.length > 0,
         programDataKeys: Object.keys(programData),
+        firstWeekStructure: transformedProgram.weeks[0] ? {
+          weekNumber: transformedProgram.weeks[0].weekNumber,
+          phase: transformedProgram.weeks[0].phase,
+          workoutsCount: transformedProgram.weeks[0].workouts?.length,
+        } : 'no weeks',
       });
       
       setProgram(transformedProgram);
