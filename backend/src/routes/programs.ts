@@ -240,6 +240,10 @@ export function register(app: App, fastify: FastifyInstance) {
             .returning();
 
           const createdProgram = result[0];
+
+          // Log detailed programData info immediately after insertion
+          const serializedCreatedData = JSON.parse(JSON.stringify(createdProgram.programData));
+          const programDataAsAny = createdProgram.programData as any;
           app.logger.info(
             {
               programId: createdProgram.id,
@@ -248,7 +252,11 @@ export function register(app: App, fastify: FastifyInstance) {
               weeksDuration: createdProgram.weeksDuration,
               split: createdProgram.split,
               hasProgramData: !!createdProgram.programData,
+              programDataType: typeof createdProgram.programData,
               programDataKeys: createdProgram.programData ? Object.keys(createdProgram.programData) : [],
+              programDataHasWeeks: !!programDataAsAny?.weeks,
+              programDataWeeksLength: Array.isArray(programDataAsAny?.weeks) ? programDataAsAny.weeks.length : 0,
+              serializedDataSample: JSON.stringify(serializedCreatedData).substring(0, 200),
             },
             'Step 4 COMPLETE: Program saved to database'
           );
@@ -534,7 +542,21 @@ export function register(app: App, fastify: FastifyInstance) {
           'Program details fetched successfully - response ready to send'
         );
 
-        return response;
+        // Explicitly serialize the entire response to ensure JSONB fields are properly converted
+        const finalResponse = JSON.parse(JSON.stringify(response));
+
+        app.logger.info(
+          {
+            trainerId,
+            programId: id,
+            finalProgramDataKeys: Object.keys(finalResponse.programData),
+            finalWeeksCount: Array.isArray(finalResponse.programData.weeks) ? finalResponse.programData.weeks.length : 0,
+            finalProgramDataSample: JSON.stringify(finalResponse.programData).substring(0, 150),
+          },
+          'Final serialized response about to be sent'
+        );
+
+        return reply.send(finalResponse);
       } catch (error) {
         app.logger.error(
           { err: error, trainerId, programId: id },
