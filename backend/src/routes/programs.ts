@@ -112,106 +112,114 @@ export function register(app: App, fastify: FastifyInstance) {
           'Step 1 COMPLETE: Client data fetched successfully'
         );
 
-        // Step 2: Build prompt
+        // Step 2: Build prompt (simplified for faster generation)
         app.logger.info({ clientId }, 'Step 2: Building AI prompt');
-        const systemPrompt = `You are an expert strength and conditioning coach. Generate a periodized workout program based on:
-- Client: ${client.age} year old ${client.gender}, ${client.experience} level
-- Goals: ${client.goals}
-- Training frequency: ${client.trainingFrequency} days/week
-- Equipment: ${client.equipment}
-- Injuries/limitations: ${client.injuries || 'None'}
-- Time per session: ${client.timePerSession} minutes
+        const systemPrompt = `You are a strength coach. Generate an 8-week periodized workout program. Return JSON with: weeksDuration, split, weeks (array with week, phase, workouts), exercises (array with name, sets, reps, rest, tempo, notes). Each exercise must have brief notes with form cues.`;
 
-Return a JSON structure with:
-- weeksDuration: integer (4-12 weeks based on goals)
-- split: string (e.g., 'Push/Pull/Legs', 'Upper/Lower', 'Full Body', 'Push/Legs/Pull')
-- weeks: array of week objects, each with:
-  - week: week number
-  - phase: string (hypertrophy/strength/power/deload/endurance)
-  - workouts: array of workout objects
-    - day: string (day name or number)
-    - exercises: array of exercise objects with ALL fields:
-      - name: string (exercise name)
-      - sets: number
-      - reps: number or string (can be range like "8-10")
-      - rest: number (seconds)
-      - tempo: string (e.g., "3-0-1-0")
-      - notes: string (REQUIRED - exercise cues, form tips, or modifications)
-- exercises: array of all unique exercises in the program with same structure
-
-IMPORTANT: Every exercise MUST have a notes field with helpful coaching cues or form tips.
-Progressive overload should increase across weeks. Avoid exercises conflicting with injuries. Balance volume across muscle groups. Match intensity/volume to experience level.`;
-
-        const userPrompt = `Generate a complete ${client.trainingFrequency} day/week periodized workout program for a ${client.experience} level client who trains ${client.timePerSession} minutes per session with access to ${client.equipment} equipment. Goal: ${client.goals}. Duration: 8-12 weeks with progressive overload. Include detailed coaching notes for each exercise.`;
+        const userPrompt = `Generate an 8-week ${client.trainingFrequency}x/week workout program for a ${client.experience} lifter. Goal: ${client.goals}. Equipment: ${client.equipment}. Sessions: ${client.timePerSession} min. Injuries: ${client.injuries || 'none'}. Include rep ranges (e.g. "8-10"), rest times in seconds (e.g. 90), and form notes.`;
 
         app.logger.info({ clientId }, 'Step 2 COMPLETE: Prompt built successfully');
 
-        // Step 3: Call AI with timeout protection (90 second timeout)
-        app.logger.info({ clientId }, 'Step 3: Calling AI to generate program (timeout: 90 seconds)');
-        let programData: ProgramData;
+        // Step 3: Call AI with retry logic (120 second timeout, 3 retries with exponential backoff)
+        app.logger.info({ clientId }, 'Step 3: Calling AI to generate program (3 retries, 120s timeout)');
+        let programData: ProgramData | null = null;
+        const maxRetries = 3;
+        const retryDelays = [2000, 5000, 10000]; // 2s, 5s, 10s in milliseconds
 
-        try {
-          // Create a timeout promise that rejects after 90 seconds
-          const timeoutPromise = new Promise<never>((_, reject) => {
-            setTimeout(() => {
-              app.logger.warn({ clientId }, 'AI generation timeout - exceeded 90 seconds');
-              reject(new Error('AI generation timed out after 90 seconds. Please try again.'));
-            }, 90000);
-          });
+        for (let attemptNumber = 1; attemptNumber <= maxRetries; attemptNumber++) {
+          try {
+            app.logger.info(
+              { clientId, attemptNumber, maxRetries },
+              `Step 3.${attemptNumber}: AI generation attempt ${attemptNumber}/${maxRetries}`
+            );
 
-          // Race the AI generation against the timeout
-          const aiPromise = (async () => {
-            app.logger.debug({ clientId }, 'Starting AI generation call');
-            const { object } = await generateObject({
-              model: gateway('openai/gpt-5-mini'),
-              schema: ProgramDataSchema,
-              schemaName: 'WorkoutProgram',
-              schemaDescription: 'Complete periodized workout program with progressive overload',
-              system: systemPrompt,
-              prompt: userPrompt,
+            // Create a timeout promise that rejects after 120 seconds
+            const timeoutPromise = new Promise<never>((_, reject) => {
+              setTimeout(() => {
+                app.logger.warn(
+                  { clientId, attemptNumber },
+                  'AI generation timeout - exceeded 120 seconds'
+                );
+                reject(new Error('AI generation timed out after 120 seconds'));
+              }, 120000);
             });
-            return object as ProgramData;
-          })();
 
-          programData = await Promise.race([aiPromise, timeoutPromise]);
+            // Race the AI generation against the timeout
+            const aiPromise = (async () => {
+              const { object } = await generateObject({
+                model: gateway('openai/gpt-5-mini'),
+                schema: ProgramDataSchema,
+                schemaName: 'WorkoutProgram',
+                schemaDescription: 'Periodized workout program',
+                system: systemPrompt,
+                prompt: userPrompt,
+              });
+              return object as ProgramData;
+            })();
 
-          app.logger.info(
-            {
-              clientId,
-              weeksDuration: programData.weeksDuration,
-              split: programData.split,
-              exerciseCount: programData.exercises.length,
-            },
-            'Step 3 COMPLETE: AI generated program successfully'
-          );
-        } catch (aiError) {
-          const errorMessage = aiError instanceof Error ? aiError.message : 'Unknown error';
-          app.logger.error(
-            {
-              err: aiError,
-              clientId,
-              trainerId,
-              errorMessage,
-              errorType: aiError instanceof Error ? aiError.constructor.name : typeof aiError,
-            },
-            'Step 3 ERROR: AI generation failed'
-          );
+            programData = await Promise.race([aiPromise, timeoutPromise]);
 
-          // Provide more specific error messages
-          let responseError = errorMessage;
-          if (errorMessage.includes('timed out')) {
-            responseError = 'AI generation timed out. Please try again.';
-          } else if (errorMessage.includes('401') || errorMessage.includes('authentication')) {
-            responseError = 'AI service authentication failed. Please contact support.';
-          } else if (errorMessage.includes('429') || errorMessage.includes('rate limit')) {
-            responseError = 'AI service is rate limited. Please try again in a moment.';
-          } else if (errorMessage.includes('500') || errorMessage.includes('server')) {
-            responseError = 'AI service is temporarily unavailable. Please try again later.';
+            app.logger.info(
+              {
+                clientId,
+                attemptNumber,
+                weeksDuration: programData.weeksDuration,
+                split: programData.split,
+                exerciseCount: programData.exercises.length,
+              },
+              'Step 3 COMPLETE: AI generated program successfully'
+            );
+            break; // Success - exit retry loop
+          } catch (aiError) {
+            const errorMessage = aiError instanceof Error ? aiError.message : 'Unknown error';
+            app.logger.warn(
+              {
+                clientId,
+                attemptNumber,
+                maxRetries,
+                errorMessage,
+              },
+              `Step 3.${attemptNumber} FAILED: Attempt ${attemptNumber}/${maxRetries} failed`
+            );
+
+            // If this was the last attempt, throw the error
+            if (attemptNumber === maxRetries) {
+              app.logger.error(
+                {
+                  err: aiError,
+                  clientId,
+                  trainerId,
+                  errorMessage,
+                  totalAttempts: attemptNumber,
+                },
+                'Step 3 FINAL ERROR: All retry attempts failed'
+              );
+
+              return reply.status(500).send({
+                success: false,
+                error: 'AI generation is currently experiencing high demand. Please try again in a few moments.',
+              });
+            }
+
+            // Wait before retrying (exponential backoff)
+            const delayMs = retryDelays[attemptNumber - 1];
+            app.logger.info(
+              { clientId, attemptNumber, delayMs },
+              `Waiting ${delayMs}ms before retry attempt ${attemptNumber + 1}`
+            );
+            await new Promise((resolve) => setTimeout(resolve, delayMs));
           }
+        }
 
+        // If we get here and programData is still null, something went wrong
+        if (!programData) {
+          app.logger.error(
+            { clientId, trainerId },
+            'Step 3 CRITICAL: No program data after all attempts'
+          );
           return reply.status(500).send({
             success: false,
-            error: responseError,
+            error: 'AI generation is currently experiencing high demand. Please try again in a few moments.',
           });
         }
 
