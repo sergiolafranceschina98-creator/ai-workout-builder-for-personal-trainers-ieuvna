@@ -146,21 +146,35 @@ Progressive overload should increase across weeks. Avoid exercises conflicting w
 
         app.logger.info({ clientId }, 'Step 2 COMPLETE: Prompt built successfully');
 
-        // Step 3: Call AI with timeout protection
-        app.logger.info({ clientId }, 'Step 3: Calling AI to generate program (this may take 30-60 seconds)');
+        // Step 3: Call AI with timeout protection (90 second timeout)
+        app.logger.info({ clientId }, 'Step 3: Calling AI to generate program (timeout: 90 seconds)');
         let programData: ProgramData;
 
         try {
-          const { object } = await generateObject({
-            model: gateway('openai/gpt-5-mini'),
-            schema: ProgramDataSchema,
-            schemaName: 'WorkoutProgram',
-            schemaDescription: 'Complete periodized workout program with progressive overload',
-            system: systemPrompt,
-            prompt: userPrompt,
+          // Create a timeout promise that rejects after 90 seconds
+          const timeoutPromise = new Promise<never>((_, reject) => {
+            setTimeout(() => {
+              app.logger.warn({ clientId }, 'AI generation timeout - exceeded 90 seconds');
+              reject(new Error('AI generation timed out after 90 seconds. Please try again.'));
+            }, 90000);
           });
 
-          programData = object as ProgramData;
+          // Race the AI generation against the timeout
+          const aiPromise = (async () => {
+            app.logger.debug({ clientId }, 'Starting AI generation call');
+            const { object } = await generateObject({
+              model: gateway('openai/gpt-5-mini'),
+              schema: ProgramDataSchema,
+              schemaName: 'WorkoutProgram',
+              schemaDescription: 'Complete periodized workout program with progressive overload',
+              system: systemPrompt,
+              prompt: userPrompt,
+            });
+            return object as ProgramData;
+          })();
+
+          programData = await Promise.race([aiPromise, timeoutPromise]);
+
           app.logger.info(
             {
               clientId,
@@ -171,13 +185,33 @@ Progressive overload should increase across weeks. Avoid exercises conflicting w
             'Step 3 COMPLETE: AI generated program successfully'
           );
         } catch (aiError) {
+          const errorMessage = aiError instanceof Error ? aiError.message : 'Unknown error';
           app.logger.error(
-            { err: aiError, clientId, trainerId },
+            {
+              err: aiError,
+              clientId,
+              trainerId,
+              errorMessage,
+              errorType: aiError instanceof Error ? aiError.constructor.name : typeof aiError,
+            },
             'Step 3 ERROR: AI generation failed'
           );
+
+          // Provide more specific error messages
+          let responseError = errorMessage;
+          if (errorMessage.includes('timed out')) {
+            responseError = 'AI generation timed out. Please try again.';
+          } else if (errorMessage.includes('401') || errorMessage.includes('authentication')) {
+            responseError = 'AI service authentication failed. Please contact support.';
+          } else if (errorMessage.includes('429') || errorMessage.includes('rate limit')) {
+            responseError = 'AI service is rate limited. Please try again in a moment.';
+          } else if (errorMessage.includes('500') || errorMessage.includes('server')) {
+            responseError = 'AI service is temporarily unavailable. Please try again later.';
+          }
+
           return reply.status(500).send({
             success: false,
-            error: `AI generation failed: ${aiError instanceof Error ? aiError.message : 'Unknown error'}`,
+            error: responseError,
           });
         }
 
