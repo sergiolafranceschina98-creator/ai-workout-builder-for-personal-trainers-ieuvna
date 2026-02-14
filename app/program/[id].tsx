@@ -116,8 +116,17 @@ export default function ProgramDetailScreen() {
       
       setProgram(transformedProgram);
       setLoading(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error('[ProgramDetail] Error fetching program details:', error);
+      
+      // If program not found (404), navigate back immediately
+      if (error?.message?.includes('404') || error?.message?.includes('not found')) {
+        console.log('[ProgramDetail] Program not found (404), navigating back');
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        router.back();
+        return;
+      }
+      
       setProgram(null);
       setLoading(false);
     }
@@ -158,6 +167,14 @@ export default function ProgramDetailScreen() {
 
   const handleDeleteProgram = async () => {
     console.log('User confirmed delete program:', id);
+    
+    if (!program?.clientId) {
+      console.error('[ProgramDetail] Cannot delete: clientId not found');
+      setErrorMessage('Unable to delete program. Client information missing.');
+      setErrorModalVisible(true);
+      return;
+    }
+    
     try {
       setDeleting(true);
       const { authenticatedDelete } = await import('@/utils/api');
@@ -165,7 +182,10 @@ export default function ProgramDetailScreen() {
       console.log('[ProgramDetail] Program deleted successfully');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setDeleteModalVisible(false);
-      router.back();
+      
+      // Navigate back to client detail page
+      console.log('[ProgramDetail] Navigating back to client:', program.clientId);
+      router.replace(`/client/${program.clientId}`);
     } catch (error: any) {
       console.error('[ProgramDetail] Error deleting program:', error);
       setErrorMessage(error.message || 'Failed to delete program.');
