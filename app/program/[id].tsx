@@ -61,6 +61,10 @@ export default function ProgramDetailScreen() {
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
   const [alternatives, setAlternatives] = useState<ExerciseAlternative[]>([]);
   const [loadingAlternatives, setLoadingAlternatives] = useState(false);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [errorModalVisible, setErrorModalVisible] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
     fetchProgramDetails();
@@ -152,6 +156,26 @@ export default function ProgramDetailScreen() {
     }
   };
 
+  const handleDeleteProgram = async () => {
+    console.log('User confirmed delete program:', id);
+    try {
+      setDeleting(true);
+      const { authenticatedDelete } = await import('@/utils/api');
+      await authenticatedDelete(`/api/programs/${id}`);
+      console.log('[ProgramDetail] Program deleted successfully');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setDeleteModalVisible(false);
+      router.back();
+    } catch (error: any) {
+      console.error('[ProgramDetail] Error deleting program:', error);
+      setErrorMessage(error.message || 'Failed to delete program.');
+      setErrorModalVisible(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   if (loading) {
     return (
       <>
@@ -203,6 +227,24 @@ export default function ProgramDetailScreen() {
           options={{
             title: 'Workout Program',
             presentation: 'modal',
+            headerRight: () => (
+              <TouchableOpacity
+                onPress={() => {
+                  console.log('User tapped delete button');
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  setDeleteModalVisible(true);
+                }}
+                style={styles.headerButton}
+                activeOpacity={0.7}
+              >
+                <IconSymbol
+                  ios_icon_name="trash"
+                  android_material_icon_name="delete"
+                  size={22}
+                  color={colors.error}
+                />
+              </TouchableOpacity>
+            ),
           }}
         />
         <View style={[styles.container, styles.centerContent, { backgroundColor: theme.colors.background }]}>
@@ -231,6 +273,92 @@ export default function ProgramDetailScreen() {
           >
             <Text style={styles.backButtonText}>Go Back</Text>
           </TouchableOpacity>
+
+          {/* Delete Confirmation Modal */}
+          <Modal
+            visible={deleteModalVisible}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setDeleteModalVisible(false)}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={[styles.confirmModalContent, { backgroundColor: theme.colors.card }]}>
+                <IconSymbol
+                  ios_icon_name="trash"
+                  android_material_icon_name="delete"
+                  size={48}
+                  color={colors.error}
+                />
+                <Text style={[styles.confirmTitle, { color: theme.colors.text }]}>
+                  Delete Program?
+                </Text>
+                <Text style={[styles.confirmMessage, { color: colors.textSecondary }]}>
+                  This action cannot be undone. The program will be permanently deleted.
+                </Text>
+                <View style={styles.confirmButtons}>
+                  <TouchableOpacity
+                    style={[styles.confirmButton, styles.cancelButton, { backgroundColor: theme.colors.background }]}
+                    onPress={() => {
+                      console.log('User cancelled delete');
+                      setDeleteModalVisible(false);
+                    }}
+                    activeOpacity={0.7}
+                    disabled={deleting}
+                  >
+                    <Text style={[styles.cancelButtonText, { color: theme.colors.text }]}>
+                      Cancel
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.confirmButton, styles.deleteButton, { backgroundColor: colors.error }]}
+                    onPress={handleDeleteProgram}
+                    activeOpacity={0.7}
+                    disabled={deleting}
+                  >
+                    {deleting ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.deleteButtonText}>Delete</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+
+          {/* Error Modal */}
+          <Modal
+            visible={errorModalVisible}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setErrorModalVisible(false)}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={[styles.confirmModalContent, { backgroundColor: theme.colors.card }]}>
+                <IconSymbol
+                  ios_icon_name="exclamationmark.triangle"
+                  android_material_icon_name="error"
+                  size={48}
+                  color={colors.error}
+                />
+                <Text style={[styles.confirmTitle, { color: theme.colors.text }]}>
+                  Error
+                </Text>
+                <Text style={[styles.confirmMessage, { color: colors.textSecondary }]}>
+                  {errorMessage}
+                </Text>
+                <TouchableOpacity
+                  style={[styles.confirmButton, styles.cancelButton, { backgroundColor: theme.colors.background }]}
+                  onPress={() => setErrorModalVisible(false)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.cancelButtonText, { color: theme.colors.text }]}>
+                    OK
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
         </View>
       </>
     );
@@ -244,6 +372,24 @@ export default function ProgramDetailScreen() {
         options={{
           title: 'Workout Program',
           presentation: 'modal',
+          headerRight: () => (
+            <TouchableOpacity
+              onPress={() => {
+                console.log('User tapped delete button');
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                setDeleteModalVisible(true);
+              }}
+              style={styles.headerButton}
+              activeOpacity={0.7}
+            >
+              <IconSymbol
+                ios_icon_name="trash"
+                android_material_icon_name="delete"
+                size={22}
+                color={colors.error}
+              />
+            </TouchableOpacity>
+          ),
         }}
       />
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -350,6 +496,7 @@ export default function ProgramDetailScreen() {
           })}
         </ScrollView>
 
+        {/* Exercise Swap Modal */}
         <Modal
           visible={swapModalVisible}
           transparent
@@ -470,6 +617,92 @@ export default function ProgramDetailScreen() {
             </View>
           </View>
         </Modal>
+
+        {/* Delete Confirmation Modal */}
+        <Modal
+          visible={deleteModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setDeleteModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.confirmModalContent, { backgroundColor: theme.colors.card }]}>
+              <IconSymbol
+                ios_icon_name="trash"
+                android_material_icon_name="delete"
+                size={48}
+                color={colors.error}
+              />
+              <Text style={[styles.confirmTitle, { color: theme.colors.text }]}>
+                Delete Program?
+              </Text>
+              <Text style={[styles.confirmMessage, { color: colors.textSecondary }]}>
+                This action cannot be undone. The program will be permanently deleted.
+              </Text>
+              <View style={styles.confirmButtons}>
+                <TouchableOpacity
+                  style={[styles.confirmButton, styles.cancelButton, { backgroundColor: theme.colors.background }]}
+                  onPress={() => {
+                    console.log('User cancelled delete');
+                    setDeleteModalVisible(false);
+                  }}
+                  activeOpacity={0.7}
+                  disabled={deleting}
+                >
+                  <Text style={[styles.cancelButtonText, { color: theme.colors.text }]}>
+                    Cancel
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.confirmButton, styles.deleteButton, { backgroundColor: colors.error }]}
+                  onPress={handleDeleteProgram}
+                  activeOpacity={0.7}
+                  disabled={deleting}
+                >
+                  {deleting ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.deleteButtonText}>Delete</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Error Modal */}
+        <Modal
+          visible={errorModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setErrorModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.confirmModalContent, { backgroundColor: theme.colors.card }]}>
+              <IconSymbol
+                ios_icon_name="exclamationmark.triangle"
+                android_material_icon_name="error"
+                size={48}
+                color={colors.error}
+              />
+              <Text style={[styles.confirmTitle, { color: theme.colors.text }]}>
+                Error
+              </Text>
+              <Text style={[styles.confirmMessage, { color: colors.textSecondary }]}>
+                {errorMessage}
+              </Text>
+              <TouchableOpacity
+                style={[styles.confirmButton, styles.cancelButton, { backgroundColor: theme.colors.background }]}
+                onPress={() => setErrorModalVisible(false)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.cancelButtonText, { color: theme.colors.text }]}>
+                  OK
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       </View>
     </>
   );
@@ -511,6 +744,10 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+  },
+  headerButton: {
+    padding: 8,
+    marginRight: 8,
   },
   header: {
     alignItems: 'center',
@@ -661,10 +898,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 40,
   },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-  },
   emptyAlternatives: {
     alignItems: 'center',
     paddingVertical: 40,
@@ -722,5 +955,61 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     fontStyle: 'italic',
+  },
+  confirmModalContent: {
+    margin: 20,
+    borderRadius: 20,
+    padding: 32,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  confirmTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  confirmMessage: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 22,
+  },
+  confirmButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  confirmButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 48,
+  },
+  cancelButton: {
+    borderWidth: 1,
+    borderColor: colors.textSecondary + '30',
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  deleteButton: {
+    shadowColor: colors.error,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  deleteButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
