@@ -327,7 +327,7 @@ export default function ClientDetailScreen() {
                   Frequency
                 </Text>
                 <Text style={[styles.infoValue, { color: theme.colors.text }]}>
-                  {client.trainingFrequency}
+                  {client.trainingFrequency} days/week
                 </Text>
               </View>
               <View style={styles.infoRow}>
@@ -343,7 +343,7 @@ export default function ClientDetailScreen() {
                   Session Time
                 </Text>
                 <Text style={[styles.infoValue, { color: theme.colors.text }]}>
-                  {client.timePerSession}
+                  {client.timePerSession} min
                 </Text>
               </View>
               {client.injuries && (
@@ -382,7 +382,7 @@ export default function ClientDetailScreen() {
                       {program.split}
                     </Text>
                     <Text style={[styles.programMeta, { color: colors.textSecondary }]}>
-                      {program.weeksDuration}
+                      {program.weeksDuration} weeks
                     </Text>
                   </View>
                   <IconSymbol
