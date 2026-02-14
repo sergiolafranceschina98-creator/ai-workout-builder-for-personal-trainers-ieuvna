@@ -233,7 +233,7 @@ export function register(app: App, fastify: FastifyInstance) {
             .values({
               clientId,
               trainerId,
-              programData: JSON.stringify(programData),
+              programData: programData as any,
               weeksDuration: programData.weeksDuration,
               split: programData.split,
             })
@@ -241,7 +241,15 @@ export function register(app: App, fastify: FastifyInstance) {
 
           const createdProgram = result[0];
           app.logger.info(
-            { programId: createdProgram.id, clientId, trainerId },
+            {
+              programId: createdProgram.id,
+              clientId,
+              trainerId,
+              weeksDuration: createdProgram.weeksDuration,
+              split: createdProgram.split,
+              hasProgramData: !!createdProgram.programData,
+              programDataKeys: createdProgram.programData ? Object.keys(createdProgram.programData) : [],
+            },
             'Step 4 COMPLETE: Program saved to database'
           );
 
@@ -414,10 +422,28 @@ export function register(app: App, fastify: FastifyInstance) {
           return reply.status(404).send({ error: 'Program not found' });
         }
 
-        // Parse programData from JSON string
-        const programData = typeof program.programData === 'string'
-          ? JSON.parse(program.programData)
-          : program.programData;
+        // Ensure programData has required structure
+        let programData = program.programData as any;
+
+        // If it's a string, parse it (for backward compatibility)
+        if (typeof programData === 'string') {
+          try {
+            programData = JSON.parse(programData);
+          } catch (e) {
+            app.logger.warn({ programId: id }, 'Failed to parse programData string');
+            programData = {};
+          }
+        }
+
+        // Validate that programData has weeks array
+        if (!programData || typeof programData !== 'object' || !Array.isArray(programData.weeks)) {
+          app.logger.warn({ programId: id, programData }, 'Invalid programData structure - missing weeks');
+          programData = {
+            weeksDuration: program.weeksDuration,
+            split: program.split,
+            weeks: [],
+          };
+        }
 
         const response = {
           ...program,
@@ -425,7 +451,7 @@ export function register(app: App, fastify: FastifyInstance) {
         };
 
         app.logger.info(
-          { trainerId, programId: id },
+          { trainerId, programId: id, hasWeeks: !!programData.weeks, weeksCount: programData.weeks?.length },
           'Program details fetched successfully'
         );
 
