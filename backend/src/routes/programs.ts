@@ -12,30 +12,30 @@ interface GenerateBody {
 
 // Zod schema for AI-generated program structure
 const ExerciseSchema = z.object({
-  name: z.string(),
-  sets: z.number(),
-  reps: z.union([z.number(), z.string()]), // can be "8-10" for rep ranges
-  rest: z.number(), // in seconds
-  tempo: z.string(), // e.g., "3-0-1-0"
-  notes: z.string().optional(),
+  name: z.string().describe('Exercise name'),
+  sets: z.number().describe('Number of sets'),
+  reps: z.union([z.number(), z.string()]).describe('Reps per set, can be a range like "8-10"'),
+  rest: z.number().describe('Rest time in seconds'),
+  tempo: z.string().describe('Tempo format like "3-0-1-0"'),
+  notes: z.string().describe('Exercise notes or cues'),
 });
 
 const WorkoutSchema = z.object({
-  day: z.string(),
-  exercises: z.array(ExerciseSchema),
+  day: z.string().describe('Workout day name or number'),
+  exercises: z.array(ExerciseSchema).describe('Array of exercises for this workout'),
 });
 
 const WeekSchema = z.object({
-  week: z.number(),
-  phase: z.string(), // hypertrophy, strength, power, deload, etc.
-  workouts: z.array(WorkoutSchema),
+  week: z.number().describe('Week number in the program'),
+  phase: z.string().describe('Training phase: hypertrophy, strength, power, deload, endurance'),
+  workouts: z.array(WorkoutSchema).describe('Workouts for this week'),
 });
 
 const ProgramDataSchema = z.object({
-  weeksDuration: z.number(),
-  split: z.string(),
-  weeks: z.array(WeekSchema),
-  exercises: z.array(ExerciseSchema),
+  weeksDuration: z.number().describe('Total duration in weeks'),
+  split: z.string().describe('Training split type'),
+  weeks: z.array(WeekSchema).describe('Array of week objects'),
+  exercises: z.array(ExerciseSchema).describe('All exercises in the program'),
 });
 
 type ProgramData = z.infer<typeof ProgramDataSchema>;
@@ -114,14 +114,24 @@ export function register(app: App, fastify: FastifyInstance) {
 - Time per session: ${client.timePerSession} minutes
 
 Return a JSON structure with:
-- weeksDuration (4-12 weeks based on goals)
-- split (e.g., 'Push/Pull/Legs', 'Upper/Lower', 'Full Body', 'Push/Legs/Pull')
-- weeks: array of week objects with week number, phase (hypertrophy/strength/power/deload/endurance), workouts array
-- Each workout: day, exercises array with name, sets, reps (can be range like "8-10"), rest (in seconds), tempo (e.g., "3-0-1-0"), notes
-- Progressive overload built in across weeks
-- Avoid exercises conflicting with injuries
-- Balance volume across muscle groups
-- Appropriate intensity and volume for experience level`;
+- weeksDuration: integer (4-12 weeks based on goals)
+- split: string (e.g., 'Push/Pull/Legs', 'Upper/Lower', 'Full Body', 'Push/Legs/Pull')
+- weeks: array of week objects, each with:
+  - week: week number
+  - phase: string (hypertrophy/strength/power/deload/endurance)
+  - workouts: array of workout objects
+    - day: string (day name or number)
+    - exercises: array of exercise objects with ALL fields:
+      - name: string (exercise name)
+      - sets: number
+      - reps: number or string (can be range like "8-10")
+      - rest: number (seconds)
+      - tempo: string (e.g., "3-0-1-0")
+      - notes: string (REQUIRED - exercise cues, form tips, or modifications)
+- exercises: array of all unique exercises in the program with same structure
+
+IMPORTANT: Every exercise MUST have a notes field with helpful coaching cues or form tips.
+Progressive overload should increase across weeks. Avoid exercises conflicting with injuries. Balance volume across muscle groups. Match intensity/volume to experience level.`;
 
         app.logger.info(
           { clientId },
