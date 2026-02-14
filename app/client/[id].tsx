@@ -47,6 +47,9 @@ export default function ClientDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [successModalVisible, setSuccessModalVisible] = useState(false);
+  const [errorModalVisible, setErrorModalVisible] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
     fetchClientDetails();
@@ -88,16 +91,22 @@ export default function ClientDetailScreen() {
 
     try {
       const { authenticatedPost } = await import('@/utils/api');
+      console.log('[ClientDetail] Calling AI program generation API...');
       const result = await authenticatedPost('/api/programs/generate', { clientId: id });
-      console.log('[ClientDetail] Program generated:', result);
+      console.log('[ClientDetail] Program generated successfully:', result);
       
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       await fetchClientPrograms();
       setGenerating(false);
-    } catch (error) {
-      console.error('Error generating program:', error);
+      setSuccessModalVisible(true);
+    } catch (error: any) {
+      console.error('[ClientDetail] Error generating program:', error);
+      const errorMessage = error?.message || 'Failed to generate program. Please try again.';
+      console.error('[ClientDetail] Error message:', errorMessage);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setGenerating(false);
+      setErrorMessage(errorMessage);
+      setErrorModalVisible(true);
     }
   };
 
@@ -500,6 +509,76 @@ export default function ClientDetailScreen() {
             </View>
           </View>
         </Modal>
+
+        <Modal
+          visible={successModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setSuccessModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: theme.colors.card }]}>
+              <View style={styles.successIconContainer}>
+                <IconSymbol
+                  ios_icon_name="checkmark.circle.fill"
+                  android_material_icon_name="check-circle"
+                  size={64}
+                  color={colors.primary}
+                />
+              </View>
+              <Text style={[styles.modalTitle, { color: theme.colors.text, textAlign: 'center' }]}>
+                Program Generated!
+              </Text>
+              <Text style={[styles.modalMessage, { color: colors.textSecondary, textAlign: 'center' }]}>
+                Your AI-powered workout program has been successfully created.
+              </Text>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonPrimary]}
+                onPress={() => setSuccessModalVisible(false)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.modalButtonText, { color: '#FFFFFF' }]}>
+                  Got it
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        <Modal
+          visible={errorModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setErrorModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: theme.colors.card }]}>
+              <View style={styles.errorIconContainer}>
+                <IconSymbol
+                  ios_icon_name="exclamationmark.triangle.fill"
+                  android_material_icon_name="error"
+                  size={64}
+                  color={colors.error}
+                />
+              </View>
+              <Text style={[styles.modalTitle, { color: theme.colors.text, textAlign: 'center' }]}>
+                Generation Failed
+              </Text>
+              <Text style={[styles.modalMessage, { color: colors.textSecondary, textAlign: 'center' }]}>
+                {errorMessage}
+              </Text>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonPrimary]}
+                onPress={() => setErrorModalVisible(false)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.modalButtonText, { color: '#FFFFFF' }]}>
+                  OK
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       </View>
     </>
   );
@@ -720,5 +799,17 @@ const styles = StyleSheet.create({
   modalButtonText: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  successIconContainer: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  errorIconContainer: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalButtonPrimary: {
+    backgroundColor: colors.primary,
+    width: '100%',
   },
 });
