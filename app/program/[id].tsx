@@ -77,27 +77,36 @@ export default function ProgramDetailScreen() {
     try {
       const { authenticatedGet } = await import('@/utils/api');
       const data = await authenticatedGet<any>(`/api/programs/${id}`);
-      console.log('[ProgramDetail] Raw API response received');
+      console.log('[ProgramDetail] ✅ Raw API response received');
       console.log('[ProgramDetail] Response keys:', Object.keys(data));
       console.log('[ProgramDetail] programData type:', typeof data.programData);
-      console.log('[ProgramDetail] programData keys:', data.programData ? Object.keys(data.programData) : 'null/undefined');
       
-      // Backend should now return programData as a properly serialized object
+      if (data.programData) {
+        console.log('[ProgramDetail] programData keys:', Object.keys(data.programData));
+        if (data.programData.weeks) {
+          console.log('[ProgramDetail] ✅ programData.weeks found with', data.programData.weeks.length, 'weeks');
+        }
+      }
+      
+      // Backend now returns programData as a properly serialized object with nested structure
       let programData = data.programData;
       
       // Validate programData structure
       if (!programData || typeof programData !== 'object') {
-        console.error('[ProgramDetail] Invalid programData - not an object:', programData);
+        console.error('[ProgramDetail] ❌ Invalid programData - not an object:', programData);
         programData = { weeks: [] };
       } else if (Object.keys(programData).length === 0) {
-        console.error('[ProgramDetail] programData is an empty object - backend serialization issue');
+        console.error('[ProgramDetail] ❌ programData is an empty object - this should be fixed in the backend now');
+        console.error('[ProgramDetail] If you see this error, the backend fix did not work properly');
         programData = { weeks: [] };
       } else if (!programData.weeks) {
-        console.error('[ProgramDetail] programData missing weeks array');
+        console.error('[ProgramDetail] ⚠️ programData missing weeks array');
         programData = { ...programData, weeks: [] };
       } else if (!Array.isArray(programData.weeks)) {
-        console.error('[ProgramDetail] programData.weeks is not an array:', typeof programData.weeks);
+        console.error('[ProgramDetail] ❌ programData.weeks is not an array:', typeof programData.weeks);
         programData = { ...programData, weeks: [] };
+      } else {
+        console.log('[ProgramDetail] ✅ programData structure is valid');
       }
       
       // Transform the API response to match the expected Program interface
@@ -126,19 +135,20 @@ export default function ProgramDetailScreen() {
         clientId: data.clientId,
       };
       
-      console.log('[ProgramDetail] Transformed program:', {
+      console.log('[ProgramDetail] ✅ Program transformation complete:', {
         id: transformedProgram.id,
         weeksDuration: transformedProgram.weeksDuration,
         split: transformedProgram.split,
         weeksCount: transformedProgram.weeks.length,
         hasWorkouts: transformedProgram.weeks.length > 0 && transformedProgram.weeks[0]?.workouts?.length > 0,
+        firstWeekWorkoutCount: transformedProgram.weeks[0]?.workouts?.length || 0,
       });
       
       setProgram(transformedProgram);
       setLoading(false);
       setRetryCount(0);
     } catch (error: any) {
-      console.error('[ProgramDetail] Error fetching program details:', error);
+      console.error('[ProgramDetail] ❌ Error fetching program details:', error);
       console.error('[ProgramDetail] Error message:', error?.message);
       
       if (error?.message?.includes('404') || error?.message?.includes('not found')) {
