@@ -98,17 +98,19 @@ export default function ClientDetailScreen() {
       'Creating exercise selection...',
       'Building progressive overload...',
       'Finalizing program structure...',
+      'Almost there, refining details...',
+      'Optimizing for your client...',
     ];
 
     let messageIndex = 0;
     const progressInterval = setInterval(() => {
       messageIndex = (messageIndex + 1) % progressMessages.length;
       setGeneratingProgress(progressMessages[messageIndex]);
-    }, 8000);
+    }, 10000); // Slower rotation to match longer generation time
 
     try {
       const { authenticatedPost } = await import('@/utils/api');
-      console.log('[ClientDetail] Calling AI program generation API...');
+      console.log('[ClientDetail] Calling AI program generation API (with retry logic)...');
       
       const result = await authenticatedPost('/api/programs/generate', { clientId: id });
       
@@ -127,10 +129,15 @@ export default function ClientDetailScreen() {
       let errorMsg = 'Failed to generate program. Please try again.';
       
       if (error?.message) {
-        if (error.message.includes('timeout') || error.message.includes('timed out')) {
-          errorMsg = 'AI generation timed out. This can happen during high demand. Please try again in a moment.';
+        // Check for the new backend error message format
+        if (error.message.includes('AI generation is currently experiencing high demand')) {
+          errorMsg = 'AI generation is currently experiencing high demand. Please try again in a few moments.';
+        } else if (error.message.includes('timeout') || error.message.includes('timed out') || error.message.includes('Gateway Time-out')) {
+          errorMsg = 'The AI is taking longer than expected. This can happen during high demand. Please try again in a moment.';
         } else if (error.message.includes('AI generation failed')) {
           errorMsg = error.message;
+        } else if (error.message.includes('API error: 500')) {
+          errorMsg = 'The AI service is temporarily unavailable. Please try again in a few moments.';
         } else if (error.message.includes('API error')) {
           errorMsg = 'Server error occurred. Please try again.';
         } else {
@@ -477,7 +484,7 @@ export default function ClientDetailScreen() {
                 <View style={styles.generatingTextContainer}>
                   <Text style={styles.generateButtonText}>Generating Program...</Text>
                   <Text style={styles.generatingProgressText}>{generatingProgress}</Text>
-                  <Text style={styles.generatingHintText}>This may take 30-90 seconds</Text>
+                  <Text style={styles.generatingHintText}>This may take 60-120 seconds</Text>
                 </View>
               </View>
             ) : (
