@@ -57,6 +57,12 @@
       "eas": {
         "projectId": "your-project-id-here"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "enabled": false
     }
   }
 }
