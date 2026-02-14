@@ -508,9 +508,16 @@ export function register(app: App, fastify: FastifyInstance) {
           };
         }
 
+        // Build response object explicitly to ensure programData is properly included
         const response = {
-          ...program,
+          id: program.id,
+          clientId: program.clientId,
+          trainerId: program.trainerId,
+          weeksDuration: program.weeksDuration,
+          split: program.split,
           programData: serializedProgramData,
+          createdAt: program.createdAt,
+          updatedAt: program.updatedAt,
         };
 
         app.logger.info(
@@ -521,6 +528,8 @@ export function register(app: App, fastify: FastifyInstance) {
             hasWeeks: !!serializedProgramData.weeks,
             weeksCount: Array.isArray(serializedProgramData.weeks) ? serializedProgramData.weeks.length : 0,
             responseKeys: Object.keys(response),
+            responseProgramDataHasWeeks: !!response.programData.weeks,
+            responseProgramDataValue: JSON.stringify(response.programData).substring(0, 100),
           },
           'Program details fetched successfully - response ready to send'
         );
