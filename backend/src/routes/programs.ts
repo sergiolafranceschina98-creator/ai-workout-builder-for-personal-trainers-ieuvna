@@ -394,13 +394,29 @@ export function register(app: App, fastify: FastifyInstance) {
         response: {
           200: {
             type: 'object',
+            // Allow additional properties to prevent schema validation from stripping programData
+            additionalProperties: true,
             properties: {
               id: { type: 'string' },
               clientId: { type: 'string' },
               trainerId: { type: 'string' },
               weeksDuration: { type: 'number' },
               split: { type: 'string' },
-              programData: { type: 'object' },
+              programData: {
+                type: 'object',
+                additionalProperties: true,
+                properties: {
+                  split: { type: 'string' },
+                  weeksDuration: { type: 'number' },
+                  weeks: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      additionalProperties: true,
+                    },
+                  },
+                },
+              },
               createdAt: { type: 'string' },
               updatedAt: { type: 'string' },
             },
@@ -435,8 +451,10 @@ export function register(app: App, fastify: FastifyInstance) {
           {
             programId: id,
             rawProgramDataType: typeof program.programData,
+            rawProgramDataValue: program.programData,
             rawProgramDataKeys: program.programData ? Object.keys(program.programData) : [],
-            rawProgramDataValue: JSON.stringify(program.programData).substring(0, 200),
+            rawProgramDataStringified: JSON.stringify(program.programData).substring(0, 200),
+            rawProgramDataConstructor: program.programData?.constructor?.name,
           },
           'Raw programData from database'
         );
@@ -490,10 +508,34 @@ export function register(app: App, fastify: FastifyInstance) {
 
         // CRITICAL: Serialize programData to ensure JSONB is converted to plain JS object
         // This prevents Postgres JSONB type issues in the API response
-        let serializedProgramData = programData;
+        let serializedProgramData: any;
         try {
-          // Force serialization: stringify then parse to convert any Postgres JSONB to plain object
-          serializedProgramData = JSON.parse(JSON.stringify(programData));
+          // Try multiple serialization approaches to handle different JSONB formats
+          const stringified = JSON.stringify(programData);
+          app.logger.info(
+            {
+              programId: id,
+              stringifyResult: stringified.substring(0, 100),
+            },
+            'JSON.stringify result'
+          );
+
+          // If stringified is empty or just "{}", reconstruct from programData properties
+          if (!stringified || stringified === '{}' || stringified === '{"weeks":[]}') {
+            app.logger.warn(
+              { programId: id, stringified },
+              'Stringified result is empty, reconstructing from programData properties'
+            );
+            serializedProgramData = {
+              split: programData?.split || program.split,
+              weeksDuration: programData?.weeksDuration || program.weeksDuration,
+              weeks: Array.isArray(programData?.weeks) ? programData.weeks : [],
+            };
+          } else {
+            // Force serialization: stringify then parse to convert any Postgres JSONB to plain object
+            serializedProgramData = JSON.parse(stringified);
+          }
+
           app.logger.info(
             {
               programId: id,
@@ -501,13 +543,14 @@ export function register(app: App, fastify: FastifyInstance) {
               serializedKeys: Object.keys(serializedProgramData),
               hasWeeks: !!serializedProgramData.weeks,
               weeksCount: Array.isArray(serializedProgramData.weeks) ? serializedProgramData.weeks.length : 0,
+              weeksFirstItem: serializedProgramData.weeks?.[0] ? JSON.stringify(serializedProgramData.weeks[0]).substring(0, 100) : 'NO_WEEKS',
             },
             'ProgramData serialized successfully'
           );
         } catch (serializeErr) {
           app.logger.error(
-            { programId: id, err: serializeErr },
-            'Failed to serialize programData - using fallback'
+            { programId: id, err: serializeErr, programDataKeys: Object.keys(programData) },
+            'Failed to serialize programData'
           );
           serializedProgramData = {
             weeksDuration: program.weeksDuration,
@@ -552,10 +595,27 @@ export function register(app: App, fastify: FastifyInstance) {
             finalProgramDataKeys: Object.keys(finalResponse.programData),
             finalWeeksCount: Array.isArray(finalResponse.programData.weeks) ? finalResponse.programData.weeks.length : 0,
             finalProgramDataSample: JSON.stringify(finalResponse.programData).substring(0, 150),
+            finalResponseKeys: Object.keys(finalResponse),
+            finalResponseFull: JSON.stringify(finalResponse).substring(0, 300),
           },
           'Final serialized response about to be sent'
         );
 
+        // Log the exact object structure before sending
+        app.logger.info(
+          {
+            programId: id,
+            programDataIsObject: typeof finalResponse.programData === 'object',
+            programDataIsNull: finalResponse.programData === null,
+            programDataKeys: finalResponse.programData ? Object.keys(finalResponse.programData) : 'NO_KEYS',
+            hasWeeksArray: Array.isArray(finalResponse.programData?.weeks),
+            weeksLength: finalResponse.programData?.weeks?.length || 0,
+          },
+          'DEBUG: Final response structure verification'
+        );
+
+        // Set content-type and send response without schema validation
+        reply.type('application/json');
         return reply.send(finalResponse);
       } catch (error) {
         app.logger.error(
