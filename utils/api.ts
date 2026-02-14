@@ -1,3 +1,4 @@
+
 import Constants from "expo-constants";
 import { Platform } from "react-native";
 import * as SecureStore from "expo-secure-store";
@@ -64,7 +65,7 @@ export const apiCall = async <T = any>(
       },
     };
 
-    console.log("[API] Fetch options:", fetchOptions);
+    console.log("[API] Fetch options:", JSON.stringify(fetchOptions, null, 2));
 
     // Always send the token if we have it (needed for cross-domain/iframe support)
     const token = await getBearerToken();
@@ -83,8 +84,31 @@ export const apiCall = async <T = any>(
       throw new Error(`API error: ${response.status} - ${text}`);
     }
 
-    const data = await response.json();
-    console.log("[API] Success:", data);
+    // Get the raw response text first
+    const responseText = await response.text();
+    console.log("[API] Raw response text length:", responseText.length);
+    console.log("[API] Raw response preview (first 500 chars):", responseText.substring(0, 500));
+
+    // Parse the JSON
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error("[API] JSON parse error:", parseError);
+      console.error("[API] Failed to parse response:", responseText);
+      throw new Error("Failed to parse server response");
+    }
+
+    // Log the parsed data structure
+    console.log("[API] Success - Response keys:", Object.keys(data));
+    if (data.programData) {
+      console.log("[API] programData type:", typeof data.programData);
+      console.log("[API] programData keys:", Object.keys(data.programData || {}));
+      if (data.programData.weeks) {
+        console.log("[API] programData.weeks length:", data.programData.weeks.length);
+      }
+    }
+
     return data;
   } catch (error) {
     console.error("[API] Request failed:", error);
