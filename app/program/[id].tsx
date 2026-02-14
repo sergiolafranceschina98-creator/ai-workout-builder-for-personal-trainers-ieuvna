@@ -65,19 +65,20 @@ export default function ProgramDetailScreen() {
   const [deleting, setDeleting] = useState(false);
   const [errorModalVisible, setErrorModalVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     fetchProgramDetails();
   }, [id]);
 
   const fetchProgramDetails = async () => {
-    console.log('[ProgramDetail] Fetching program details for:', id);
+    console.log('[ProgramDetail] Fetching program details for:', id, 'Retry count:', retryCount);
     try {
       const { authenticatedGet } = await import('@/utils/api');
       const data = await authenticatedGet<any>(`/api/programs/${id}`);
-      console.log('[ProgramDetail] Fetched program:', data);
-      console.log('[ProgramDetail] programData:', data.programData);
+      console.log('[ProgramDetail] Raw API response:', JSON.stringify(data, null, 2));
       console.log('[ProgramDetail] programData type:', typeof data.programData);
+      console.log('[ProgramDetail] programData value:', data.programData);
       
       // Backend now returns programData as a parsed object, but handle string fallback for compatibility
       let programData = data.programData;
@@ -86,14 +87,20 @@ export default function ProgramDetailScreen() {
           programData = JSON.parse(programData);
           console.log('[ProgramDetail] Parsed programData from string (legacy):', programData);
         } catch (parseError) {
-          console.error('[ProgramDetail] Failed to parse programData:', parseError);
+          console.error('[ProgramDetail] Failed to parse programData string:', parseError);
           programData = { weeks: [] };
         }
       }
       
       // Validate programData structure
       if (!programData || typeof programData !== 'object') {
-        console.error('[ProgramDetail] Invalid programData structure:', programData);
+        console.error('[ProgramDetail] Invalid programData structure - not an object:', programData);
+        programData = { weeks: [] };
+      }
+      
+      // Check if programData is an empty object
+      if (Object.keys(programData).length === 0) {
+        console.error('[ProgramDetail] programData is an empty object - no workout data available');
         programData = { weeks: [] };
       }
       
@@ -111,13 +118,17 @@ export default function ProgramDetailScreen() {
         weeksDuration: transformedProgram.weeksDuration,
         split: transformedProgram.split,
         weeksCount: transformedProgram.weeks.length,
-        hasWorkouts: transformedProgram.weeks.length > 0 && transformedProgram.weeks[0].workouts?.length > 0,
+        hasWorkouts: transformedProgram.weeks.length > 0 && transformedProgram.weeks[0]?.workouts?.length > 0,
+        programDataKeys: Object.keys(programData),
       });
       
       setProgram(transformedProgram);
       setLoading(false);
+      setRetryCount(0); // Reset retry count on success
     } catch (error: any) {
       console.error('[ProgramDetail] Error fetching program details:', error);
+      console.error('[ProgramDetail] Error message:', error?.message);
+      console.error('[ProgramDetail] Error stack:', error?.stack);
       
       // If program not found (404), navigate back immediately
       if (error?.message?.includes('404') || error?.message?.includes('not found')) {
@@ -130,6 +141,14 @@ export default function ProgramDetailScreen() {
       setProgram(null);
       setLoading(false);
     }
+  };
+
+  const handleRetry = () => {
+    console.log('[ProgramDetail] User tapped retry button');
+    setRetryCount(retryCount + 1);
+    setLoading(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    fetchProgramDetails();
   };
 
   const handleSwapExercise = async (exercise: Exercise) => {
@@ -234,6 +253,19 @@ export default function ProgramDetailScreen() {
           <Text style={[styles.errorText, { color: theme.colors.text }]}>
             Program not found
           </Text>
+          <TouchableOpacity
+            style={[styles.retryButton, { backgroundColor: colors.primary }]}
+            onPress={handleRetry}
+            activeOpacity={0.7}
+          >
+            <IconSymbol
+              ios_icon_name="arrow.clockwise"
+              android_material_icon_name="refresh"
+              size={20}
+              color="#FFFFFF"
+            />
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
         </View>
       </>
     );
@@ -241,6 +273,8 @@ export default function ProgramDetailScreen() {
 
   // Check if program has no weeks (empty program data)
   if (program.weeks.length === 0) {
+    const retryText = retryCount > 0 ? `Retry (${retryCount})` : 'Retry';
+    
     return (
       <>
         <Stack.Screen
@@ -281,18 +315,35 @@ export default function ProgramDetailScreen() {
             This program was generated but the workout data could not be loaded.
           </Text>
           <Text style={[styles.errorSubtext, { color: colors.textSecondary }]}>
-            This may have been caused by a temporary issue during generation.
+            The backend may still be processing the program data.
           </Text>
           <Text style={[styles.errorSubtext, { color: colors.textSecondary }]}>
-            Please try generating a new program for this client.
+            Try refreshing, or generate a new program if the issue persists.
           </Text>
-          <TouchableOpacity
-            style={[styles.backButton, { backgroundColor: colors.primary }]}
-            onPress={() => router.back()}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.backButtonText}>Go Back</Text>
-          </TouchableOpacity>
+          
+          <View style={styles.buttonRow}>
+            <TouchableOpacity
+              style={[styles.actionButton, { backgroundColor: colors.primary }]}
+              onPress={handleRetry}
+              activeOpacity={0.7}
+            >
+              <IconSymbol
+                ios_icon_name="arrow.clockwise"
+                android_material_icon_name="refresh"
+                size={20}
+                color="#FFFFFF"
+              />
+              <Text style={styles.actionButtonText}>{retryText}</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[styles.actionButton, { backgroundColor: theme.colors.card, borderWidth: 1, borderColor: colors.textSecondary + '30' }]}
+              onPress={() => router.back()}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.actionButtonTextSecondary, { color: theme.colors.text }]}>Go Back</Text>
+            </TouchableOpacity>
+          </View>
 
           {/* Delete Confirmation Modal */}
           <Modal
@@ -735,6 +786,7 @@ const styles = StyleSheet.create({
   centerContent: {
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
   },
   scrollContent: {
     paddingBottom: 40,
@@ -747,20 +799,51 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 18,
     fontWeight: '600',
+    textAlign: 'center',
   },
   errorSubtext: {
     marginTop: 8,
     fontSize: 14,
     textAlign: 'center',
     paddingHorizontal: 32,
+    lineHeight: 20,
   },
-  backButton: {
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 24,
+    paddingHorizontal: 20,
+  },
+  actionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    gap: 8,
+  },
+  actionButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  actionButtonTextSecondary: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginTop: 24,
     paddingHorizontal: 32,
     paddingVertical: 12,
-    borderRadius: 8,
+    borderRadius: 12,
+    gap: 8,
   },
-  backButtonText: {
+  retryButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
