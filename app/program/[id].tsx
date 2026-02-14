@@ -17,9 +17,9 @@ import * as Haptics from 'expo-haptics';
 
 interface Exercise {
   name: string;
-  sets: string;
+  sets: string | number;
   reps: string;
-  rest: string;
+  rest: string | number;
   tempo?: string;
   notes?: string;
 }
@@ -31,6 +31,7 @@ interface Workout {
 
 interface Week {
   weekNumber: number;
+  week?: number;
   phase: string;
   workouts: Workout[];
 }
@@ -76,41 +77,45 @@ export default function ProgramDetailScreen() {
     try {
       const { authenticatedGet } = await import('@/utils/api');
       const data = await authenticatedGet<any>(`/api/programs/${id}`);
-      console.log('[ProgramDetail] Raw API response:', JSON.stringify(data, null, 2));
+      console.log('[ProgramDetail] Raw API response received');
+      console.log('[ProgramDetail] Response keys:', Object.keys(data));
       console.log('[ProgramDetail] programData type:', typeof data.programData);
-      console.log('[ProgramDetail] programData value:', data.programData);
+      console.log('[ProgramDetail] programData keys:', data.programData ? Object.keys(data.programData) : 'null/undefined');
       
-      // Backend now returns programData as a parsed object, but handle string fallback for compatibility
+      // Backend should now return programData as a properly serialized object
       let programData = data.programData;
-      if (typeof programData === 'string') {
-        try {
-          programData = JSON.parse(programData);
-          console.log('[ProgramDetail] Parsed programData from string (legacy):', programData);
-        } catch (parseError) {
-          console.error('[ProgramDetail] Failed to parse programData string:', parseError);
-          programData = { weeks: [] };
-        }
-      }
       
       // Validate programData structure
       if (!programData || typeof programData !== 'object') {
-        console.error('[ProgramDetail] Invalid programData structure - not an object:', programData);
+        console.error('[ProgramDetail] Invalid programData - not an object:', programData);
         programData = { weeks: [] };
-      }
-      
-      // Check if programData is an empty object
-      if (Object.keys(programData).length === 0) {
-        console.error('[ProgramDetail] programData is an empty object - no workout data available');
+      } else if (Object.keys(programData).length === 0) {
+        console.error('[ProgramDetail] programData is an empty object - backend serialization issue');
         programData = { weeks: [] };
+      } else if (!programData.weeks) {
+        console.error('[ProgramDetail] programData missing weeks array');
+        programData = { ...programData, weeks: [] };
+      } else if (!Array.isArray(programData.weeks)) {
+        console.error('[ProgramDetail] programData.weeks is not an array:', typeof programData.weeks);
+        programData = { ...programData, weeks: [] };
       }
       
       // Transform the API response to match the expected Program interface
-      // Backend returns 'week' but frontend expects 'weekNumber'
       const weeksArray = Array.isArray(programData.weeks) ? programData.weeks : [];
       const transformedWeeks = weeksArray.map((w: any) => ({
         weekNumber: w.week || w.weekNumber || 0,
         phase: w.phase || '',
-        workouts: Array.isArray(w.workouts) ? w.workouts : [],
+        workouts: Array.isArray(w.workouts) ? w.workouts.map((workout: any) => ({
+          day: workout.day || '',
+          exercises: Array.isArray(workout.exercises) ? workout.exercises.map((ex: any) => ({
+            name: ex.name || '',
+            sets: String(ex.sets || ''),
+            reps: String(ex.reps || ''),
+            rest: String(ex.rest || ''),
+            tempo: ex.tempo,
+            notes: ex.notes,
+          })) : [],
+        })) : [],
       }));
       
       const transformedProgram: Program = {
@@ -127,23 +132,15 @@ export default function ProgramDetailScreen() {
         split: transformedProgram.split,
         weeksCount: transformedProgram.weeks.length,
         hasWorkouts: transformedProgram.weeks.length > 0 && transformedProgram.weeks[0]?.workouts?.length > 0,
-        programDataKeys: Object.keys(programData),
-        firstWeekStructure: transformedProgram.weeks[0] ? {
-          weekNumber: transformedProgram.weeks[0].weekNumber,
-          phase: transformedProgram.weeks[0].phase,
-          workoutsCount: transformedProgram.weeks[0].workouts?.length,
-        } : 'no weeks',
       });
       
       setProgram(transformedProgram);
       setLoading(false);
-      setRetryCount(0); // Reset retry count on success
+      setRetryCount(0);
     } catch (error: any) {
       console.error('[ProgramDetail] Error fetching program details:', error);
       console.error('[ProgramDetail] Error message:', error?.message);
-      console.error('[ProgramDetail] Error stack:', error?.stack);
       
-      // If program not found (404), navigate back immediately
       if (error?.message?.includes('404') || error?.message?.includes('not found')) {
         console.log('[ProgramDetail] Program not found (404), navigating back');
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -215,7 +212,6 @@ export default function ProgramDetailScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setDeleteModalVisible(false);
       
-      // Navigate back to client detail page
       console.log('[ProgramDetail] Navigating back to client:', program.clientId);
       router.replace(`/client/${program.clientId}`);
     } catch (error: any) {
@@ -277,14 +273,15 @@ export default function ProgramDetailScreen() {
               size={20}
               color="#FFFFFF"
             />
-            <Text style={styles.retryButtonText}>Retry</Text>
+            <Text style={styles.retryButtonText}>
+              Retry
+            </Text>
           </TouchableOpacity>
         </View>
       </>
     );
   }
 
-  // Check if program has no weeks (empty program data)
   if (program.weeks.length === 0) {
     const retryText = retryCount > 0 ? `Retry (${retryCount})` : 'Retry';
     
@@ -328,10 +325,10 @@ export default function ProgramDetailScreen() {
             This program was generated but the workout data could not be loaded.
           </Text>
           <Text style={[styles.errorSubtext, { color: colors.textSecondary }]}>
-            The backend may still be processing the program data.
+            This is likely a backend serialization issue that has been fixed.
           </Text>
           <Text style={[styles.errorSubtext, { color: colors.textSecondary }]}>
-            Try refreshing, or generate a new program if the issue persists.
+            Try refreshing below. If the issue persists, delete and regenerate the program.
           </Text>
           
           <View style={styles.buttonRow}>
@@ -346,7 +343,9 @@ export default function ProgramDetailScreen() {
                 size={20}
                 color="#FFFFFF"
               />
-              <Text style={styles.actionButtonText}>{retryText}</Text>
+              <Text style={styles.actionButtonText}>
+                {retryText}
+              </Text>
             </TouchableOpacity>
             
             <TouchableOpacity
@@ -354,11 +353,12 @@ export default function ProgramDetailScreen() {
               onPress={() => router.back()}
               activeOpacity={0.7}
             >
-              <Text style={[styles.actionButtonTextSecondary, { color: theme.colors.text }]}>Go Back</Text>
+              <Text style={[styles.actionButtonTextSecondary, { color: theme.colors.text }]}>
+                Go Back
+              </Text>
             </TouchableOpacity>
           </View>
 
-          {/* Delete Confirmation Modal */}
           <Modal
             visible={deleteModalVisible}
             transparent
@@ -402,7 +402,9 @@ export default function ProgramDetailScreen() {
                     {deleting ? (
                       <ActivityIndicator size="small" color="#FFFFFF" />
                     ) : (
-                      <Text style={styles.deleteButtonText}>Delete</Text>
+                      <Text style={styles.deleteButtonText}>
+                        Delete
+                      </Text>
                     )}
                   </TouchableOpacity>
                 </View>
@@ -410,7 +412,6 @@ export default function ProgramDetailScreen() {
             </View>
           </Modal>
 
-          {/* Error Modal */}
           <Modal
             visible={errorModalVisible}
             transparent
@@ -580,7 +581,6 @@ export default function ProgramDetailScreen() {
           })}
         </ScrollView>
 
-        {/* Exercise Swap Modal */}
         <Modal
           visible={swapModalVisible}
           transparent
@@ -702,7 +702,6 @@ export default function ProgramDetailScreen() {
           </View>
         </Modal>
 
-        {/* Delete Confirmation Modal */}
         <Modal
           visible={deleteModalVisible}
           transparent
@@ -746,7 +745,9 @@ export default function ProgramDetailScreen() {
                   {deleting ? (
                     <ActivityIndicator size="small" color="#FFFFFF" />
                   ) : (
-                    <Text style={styles.deleteButtonText}>Delete</Text>
+                    <Text style={styles.deleteButtonText}>
+                      Delete
+                    </Text>
                   )}
                 </TouchableOpacity>
               </View>
@@ -754,7 +755,6 @@ export default function ProgramDetailScreen() {
           </View>
         </Modal>
 
-        {/* Error Modal */}
         <Modal
           visible={errorModalVisible}
           transparent
