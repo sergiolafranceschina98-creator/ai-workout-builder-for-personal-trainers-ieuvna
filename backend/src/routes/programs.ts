@@ -147,7 +147,7 @@ export function register(app: App, fastify: FastifyInstance) {
             // Race the AI generation against the timeout
             const aiPromise = (async () => {
               const { object } = await generateObject({
-                model: gateway('openai/gpt-5-mini'),
+                model: gateway('google/gemini-3-pro'),
                 schema: ProgramDataSchema,
                 schemaName: 'WorkoutProgram',
                 schemaDescription: 'Periodized workout program',
