@@ -11,12 +11,13 @@ import {
   Platform,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { IconSymbol } from '@/components/IconSymbol';
-import { colors, shadows } from '@/styles/commonStyles';
-import { useAuth } from '@/contexts/AuthContext';
+import { useTheme } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { IconSymbol } from '@/components/IconSymbol';
 import ProgressRing from '@/components/ProgressRing';
 import StatCard from '@/components/StatCard';
+import { colors, shadows } from '@/styles/commonStyles';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Client {
   id: string;
@@ -31,6 +32,7 @@ interface Client {
 
 export default function HomeScreen() {
   const router = useRouter();
+  const theme = useTheme();
   const { user } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,11 +45,12 @@ export default function HomeScreen() {
       const data = await authenticatedGet<Client[]>('/api/clients');
       console.log('[Home] Fetched clients:', data);
       setClients(data);
-      setLoading(false);
     } catch (error) {
       console.error('Error fetching clients:', error);
       setClients([]);
+    } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -57,7 +60,6 @@ export default function HomeScreen() {
     }
   }, [user]);
 
-  // Refresh client list when screen comes into focus
   useFocusEffect(
     useCallback(() => {
       console.log('[Home] Screen focused - refreshing client list');
@@ -67,10 +69,9 @@ export default function HomeScreen() {
     }, [user])
   );
 
-  const onRefresh = async () => {
+  const onRefresh = () => {
     setRefreshing(true);
-    await fetchClients();
-    setRefreshing(false);
+    fetchClients();
   };
 
   const handleAddClient = () => {
@@ -79,265 +80,225 @@ export default function HomeScreen() {
   };
 
   const handleClientPress = (clientId: string) => {
-    console.log('User tapped client:', clientId);
+    console.log('User tapped client card:', clientId);
     router.push(`/client/${clientId}`);
   };
 
   const getExperienceBadgeColor = (experience: string) => {
-    const expLower = experience.toLowerCase();
-    if (expLower === 'beginner') return colors.success;
-    if (expLower === 'intermediate') return colors.warning;
-    if (expLower === 'advanced') return colors.error;
+    const exp = experience.toLowerCase();
+    if (exp === 'beginner') return colors.success;
+    if (exp === 'intermediate') return colors.accent;
+    if (exp === 'advanced') return colors.error;
     return colors.textSecondary;
   };
 
   const formatGoal = (goal: string) => {
-    const goalMap: { [key: string]: string } = {
-      fat_loss: 'Fat Loss',
-      hypertrophy: 'Muscle Growth',
-      strength: 'Strength',
-      rehab: 'Rehabilitation',
-      sport_specific: 'Sport Specific',
+    const goalMap: Record<string, string> = {
+      'fat_loss': 'Fat Loss',
+      'hypertrophy': 'Muscle Growth',
+      'strength': 'Strength',
+      'rehab': 'Rehabilitation',
+      'sport_specific': 'Sport Performance',
     };
     return goalMap[goal] || goal;
   };
 
-  // Calculate stats
-  const totalClients = clients.length;
-  const activeClients = clients.length;
-  const beginnerCount = clients.filter(c => c.experience.toLowerCase() === 'beginner').length;
-  const intermediateCount = clients.filter(c => c.experience.toLowerCase() === 'intermediate').length;
-  const advancedCount = clients.filter(c => c.experience.toLowerCase() === 'advanced').length;
-
-  if (!user) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.emptyContainer}>
-          <View style={styles.emptyIconContainer}>
-            <IconSymbol
-              ios_icon_name="person"
-              android_material_icon_name="person"
-              size={64}
-              color={colors.textTertiary}
-            />
-          </View>
-          <Text style={styles.emptyTitle}>Welcome to AI Workout Builder</Text>
-          <Text style={styles.emptySubtitle}>
-            Sign in to start creating personalized workout programs for your clients
-          </Text>
-          <TouchableOpacity
-            style={styles.primaryButton}
-            onPress={() => router.push('/auth')}
-          >
-            <Text style={styles.primaryButtonText}>Sign In</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
-
   if (loading) {
     return (
-      <View style={[styles.container, styles.centerContent]}>
+      <View style={[styles.container, styles.centerContent, { backgroundColor: theme.colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Loading your dashboard...</Text>
+        <Text style={[styles.loadingText, { color: theme.colors.text }]}>
+          Loading clients...
+        </Text>
       </View>
     );
   }
 
+  const totalClients = clients.length;
+  const activePrograms = 0;
+  const completionRate = 0;
+
+  const userName = user?.name || 'Trainer';
+  const greetingText = `Welcome back, ${userName}!`;
+  const subtitleText = 'Manage your clients and programs';
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+          />
         }
-        showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.greeting}>Welcome back,</Text>
-            <Text style={styles.userName}>{user.name || 'Trainer'}</Text>
+        <LinearGradient
+          colors={[colors.primary, colors.accent]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.headerGradient}
+        >
+          <View style={styles.headerContent}>
+            <View style={styles.headerTextContainer}>
+              <Text style={styles.greeting}>
+                {greetingText}
+              </Text>
+              <Text style={styles.subtitle}>
+                {subtitleText}
+              </Text>
+            </View>
+            <View style={styles.headerIcon}>
+              <IconSymbol
+                ios_icon_name="figure.strengthtraining.traditional"
+                android_material_icon_name="fitness-center"
+                size={48}
+                color="#FFFFFF"
+              />
+            </View>
           </View>
-          <TouchableOpacity style={styles.notificationButton}>
+        </LinearGradient>
+
+        <View style={styles.statsContainer}>
+          <StatCard
+            title="Total Clients"
+            value={totalClients.toString()}
+            icon="person"
+            color={colors.primary}
+          />
+          <StatCard
+            title="Active Programs"
+            value={activePrograms.toString()}
+            icon="description"
+            color={colors.accent}
+          />
+          <StatCard
+            title="Completion Rate"
+            value={`${completionRate}%`}
+            icon="check-circle"
+            color={colors.success}
+          />
+        </View>
+
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+            Your Clients
+          </Text>
+          <TouchableOpacity
+            style={[styles.addButton, { backgroundColor: colors.primary }]}
+            onPress={handleAddClient}
+            activeOpacity={0.7}
+          >
             <IconSymbol
-              ios_icon_name="notifications"
-              android_material_icon_name="notifications"
-              size={24}
-              color={colors.text}
+              ios_icon_name="plus"
+              android_material_icon_name="add"
+              size={20}
+              color="#FFFFFF"
             />
+            <Text style={styles.addButtonText}>
+              Add Client
+            </Text>
           </TouchableOpacity>
         </View>
 
         {clients.length === 0 ? (
-          <View style={styles.emptyStateCard}>
-            <LinearGradient
-              colors={[colors.gradientStart, colors.gradientEnd]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.emptyGradient}
+          <View style={[styles.emptyState, { backgroundColor: theme.colors.card }]}>
+            <IconSymbol
+              ios_icon_name="person.crop.circle.badge.plus"
+              android_material_icon_name="person-add"
+              size={64}
+              color={colors.textSecondary}
+            />
+            <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>
+              No Clients Yet
+            </Text>
+            <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
+              Add your first client to start creating personalized workout programs
+            </Text>
+            <TouchableOpacity
+              style={[styles.emptyButton, { backgroundColor: colors.primary }]}
+              onPress={handleAddClient}
+              activeOpacity={0.7}
             >
               <IconSymbol
-                ios_icon_name="group"
-                android_material_icon_name="group"
-                size={64}
+                ios_icon_name="plus.circle.fill"
+                android_material_icon_name="add-circle"
+                size={24}
                 color="#FFFFFF"
               />
-              <Text style={styles.emptyStateTitle}>No Clients Yet</Text>
-              <Text style={styles.emptyStateSubtitle}>
-                Add your first client to start creating AI-powered workout programs
+              <Text style={styles.emptyButtonText}>
+                Add Your First Client
               </Text>
-            </LinearGradient>
+            </TouchableOpacity>
           </View>
         ) : (
-          <>
-            {/* Stats Overview */}
-            <View style={styles.statsSection}>
-              <Text style={styles.sectionTitle}>Overview</Text>
-              <View style={styles.statsGrid}>
-                <StatCard
-                  title="Total Clients"
-                  value={totalClients}
-                  icon="group"
-                  iconColor={colors.primary}
-                  gradient={true}
-                  style={styles.statCard}
-                />
-                <StatCard
-                  title="Active Programs"
-                  value={activeClients}
-                  icon="fitness-center"
-                  iconColor={colors.success}
-                  style={styles.statCard}
-                />
-              </View>
-            </View>
-
-            {/* Experience Distribution */}
-            <View style={styles.progressSection}>
-              <Text style={styles.sectionTitle}>Client Experience</Text>
-              <View style={styles.progressGrid}>
-                <ProgressRing
-                  value={beginnerCount}
-                  maxValue={totalClients}
-                  size={100}
-                  strokeWidth={10}
-                  title="Beginner"
-                  subtitle={`${beginnerCount} clients`}
-                  color={colors.success}
-                />
-                <ProgressRing
-                  value={intermediateCount}
-                  maxValue={totalClients}
-                  size={100}
-                  strokeWidth={10}
-                  title="Intermediate"
-                  subtitle={`${intermediateCount} clients`}
-                  color={colors.warning}
-                />
-                <ProgressRing
-                  value={advancedCount}
-                  maxValue={totalClients}
-                  size={100}
-                  strokeWidth={10}
-                  title="Advanced"
-                  subtitle={`${advancedCount} clients`}
-                  color={colors.error}
-                />
-              </View>
-            </View>
-
-            {/* Clients List */}
-            <View style={styles.clientsSection}>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Your Clients</Text>
-                <Text style={styles.clientCount}>{totalClients}</Text>
-              </View>
-              <View style={styles.clientList}>
-                {clients.map((client) => {
-                  const experienceColor = getExperienceBadgeColor(client.experience);
-                  const goalText = formatGoal(client.goals);
-                  const frequencyText = `${client.trainingFrequency}x/week`;
-                  
-                  return (
-                    <TouchableOpacity
-                      key={client.id}
-                      style={styles.clientCard}
-                      onPress={() => handleClientPress(client.id)}
-                      activeOpacity={0.7}
-                    >
-                      <View style={styles.clientHeader}>
-                        <View style={styles.clientAvatar}>
-                          <IconSymbol
-                            ios_icon_name="person"
-                            android_material_icon_name="person"
-                            size={24}
-                            color={colors.primary}
-                          />
-                        </View>
-                        <View style={styles.clientInfo}>
-                          <Text style={styles.clientName}>{client.name}</Text>
-                          <View style={styles.clientMeta}>
-                            <Text style={styles.clientMetaText}>{client.age}</Text>
-                            <Text style={styles.clientMetaText}>•</Text>
-                            <Text style={styles.clientMetaText}>{client.gender}</Text>
-                          </View>
-                        </View>
-                        <IconSymbol
-                          ios_icon_name="arrow-forward"
-                          android_material_icon_name="arrow-forward"
-                          size={20}
-                          color={colors.textSecondary}
-                        />
+          <View style={styles.clientsList}>
+            {clients.map((client) => {
+              const experienceColor = getExperienceBadgeColor(client.experience);
+              const goalText = formatGoal(client.goals);
+              const frequencyText = `${client.trainingFrequency}x/week`;
+              const experienceText = client.experience;
+              
+              return (
+                <TouchableOpacity
+                  key={client.id}
+                  style={[styles.clientCard, { backgroundColor: theme.colors.card }, shadows.medium]}
+                  onPress={() => handleClientPress(client.id)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.clientHeader}>
+                    <View style={[styles.clientAvatar, { backgroundColor: colors.primary + '20' }]}>
+                      <Text style={[styles.clientInitial, { color: colors.primary }]}>
+                        {client.name.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                    <View style={styles.clientInfo}>
+                      <Text style={[styles.clientName, { color: theme.colors.text }]}>
+                        {client.name}
+                      </Text>
+                      <View style={styles.clientMeta}>
+                        <Text style={[styles.clientMetaText, { color: colors.textSecondary }]}>
+                          {client.age} yrs
+                        </Text>
+                        <Text style={[styles.clientMetaText, { color: colors.textSecondary }]}>
+                          •
+                        </Text>
+                        <Text style={[styles.clientMetaText, { color: colors.textSecondary }]}>
+                          {client.gender}
+                        </Text>
                       </View>
-                      
-                      <View style={styles.clientDetails}>
-                        <View style={[styles.badge, { backgroundColor: experienceColor + '20' }]}>
-                          <Text style={[styles.badgeText, { color: experienceColor }]}>
-                            {client.experience}
-                          </Text>
-                        </View>
-                        <View style={[styles.badge, { backgroundColor: colors.primary + '20' }]}>
-                          <Text style={[styles.badgeText, { color: colors.primary }]}>
-                            {goalText}
-                          </Text>
-                        </View>
-                        <View style={[styles.badge, { backgroundColor: colors.accent + '20' }]}>
-                          <Text style={[styles.badgeText, { color: colors.accent }]}>
-                            {frequencyText}
-                          </Text>
-                        </View>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-          </>
+                    </View>
+                    <IconSymbol
+                      ios_icon_name="chevron.right"
+                      android_material_icon_name="chevron-right"
+                      size={24}
+                      color={colors.textSecondary}
+                    />
+                  </View>
+                  <View style={styles.clientDetails}>
+                    <View style={[styles.badge, { backgroundColor: experienceColor + '20' }]}>
+                      <Text style={[styles.badgeText, { color: experienceColor }]}>
+                        {experienceText}
+                      </Text>
+                    </View>
+                    <View style={[styles.badge, { backgroundColor: colors.accent + '20' }]}>
+                      <Text style={[styles.badgeText, { color: colors.accent }]}>
+                        {goalText}
+                      </Text>
+                    </View>
+                    <View style={[styles.badge, { backgroundColor: colors.primary + '20' }]}>
+                      <Text style={[styles.badgeText, { color: colors.primary }]}>
+                        {frequencyText}
+                      </Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         )}
       </ScrollView>
-
-      {/* Floating Action Button */}
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={handleAddClient}
-        activeOpacity={0.8}
-      >
-        <LinearGradient
-          colors={[colors.gradientStart, colors.gradientEnd]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.fabGradient}
-        >
-          <IconSymbol
-            ios_icon_name="add"
-            android_material_icon_name="add"
-            size={28}
-            color="#FFFFFF"
-          />
-        </LinearGradient>
-      </TouchableOpacity>
     </View>
   );
 }
@@ -345,194 +306,140 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
   },
   centerContent: {
     justifyContent: 'center',
     alignItems: 'center',
   },
   scrollContent: {
-    flexGrow: 1,
-    paddingBottom: 120,
+    paddingBottom: 100,
   },
   loadingText: {
-    marginTop: 16,
+    marginTop: 12,
     fontSize: 16,
-    color: colors.textSecondary,
-    fontWeight: '500',
   },
-  header: {
+  headerGradient: {
+    paddingTop: Platform.OS === 'android' ? 48 : 0,
+    paddingHorizontal: 20,
+    paddingBottom: 32,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+  },
+  headerContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'android' ? 48 : 20,
-    paddingBottom: 24,
+  },
+  headerTextContainer: {
+    flex: 1,
   },
   greeting: {
-    fontSize: 16,
-    color: colors.textSecondary,
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
     marginBottom: 4,
   },
-  userName: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: colors.text,
-    letterSpacing: -0.5,
-  },
-  notificationButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: colors.card,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-    minHeight: 500,
-  },
-  emptyIconContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: colors.card,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  emptyTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: colors.text,
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  emptySubtitle: {
+  subtitle: {
     fontSize: 16,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 32,
-  },
-  primaryButton: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-    borderRadius: 12,
-    ...shadows.medium,
-  },
-  primaryButtonText: {
     color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-    letterSpacing: 0.3,
+    opacity: 0.9,
   },
-  emptyStateCard: {
-    marginHorizontal: 20,
-    marginTop: 20,
-    borderRadius: 20,
-    overflow: 'hidden',
-    ...shadows.large,
-  },
-  emptyGradient: {
-    padding: 40,
+  headerIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  emptyStateTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginTop: 20,
-    marginBottom: 8,
-  },
-  emptyStateSubtitle: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.8)',
-    textAlign: 'center',
-    lineHeight: 24,
-  },
-  statsSection: {
-    paddingHorizontal: 20,
-    marginBottom: 32,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.text,
-    marginBottom: 16,
-    letterSpacing: -0.3,
-  },
-  statsGrid: {
+  statsContainer: {
     flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingTop: 20,
     gap: 12,
-  },
-  statCard: {
-    flex: 1,
-  },
-  progressSection: {
-    paddingHorizontal: 20,
-    marginBottom: 32,
-  },
-  progressGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    backgroundColor: colors.card,
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.small,
-  },
-  clientsSection: {
-    paddingHorizontal: 20,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 16,
   },
-  clientCount: {
+  sectionTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+  },
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 6,
+  },
+  addButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  emptyState: {
+    marginHorizontal: 20,
+    marginTop: 20,
+    padding: 40,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 15,
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 22,
+  },
+  emptyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 24,
+    gap: 8,
+  },
+  emptyButtonText: {
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
-    color: colors.primary,
-    backgroundColor: colors.accentGlow,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
   },
-  clientList: {
+  clientsList: {
+    paddingHorizontal: 20,
     gap: 12,
   },
   clientCard: {
-    backgroundColor: colors.card,
     borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.small,
+    padding: 16,
+    marginBottom: 4,
   },
   clientHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   clientAvatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
-    backgroundColor: colors.accentGlow,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: 12,
+  },
+  clientInitial: {
+    fontSize: 20,
+    fontWeight: 'bold',
   },
   clientInfo: {
     flex: 1,
@@ -540,18 +447,15 @@ const styles = StyleSheet.create({
   clientName: {
     fontSize: 18,
     fontWeight: '600',
-    color: colors.text,
     marginBottom: 4,
-    letterSpacing: -0.2,
   },
   clientMeta: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   clientMetaText: {
     fontSize: 14,
-    color: colors.textSecondary,
   },
   clientDetails: {
     flexDirection: 'row',
@@ -561,26 +465,11 @@ const styles = StyleSheet.create({
   badge: {
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 8,
+    borderRadius: 12,
   },
   badgeText: {
     fontSize: 12,
     fontWeight: '600',
-  },
-  fab: {
-    position: 'absolute',
-    right: 20,
-    bottom: Platform.OS === 'ios' ? 100 : 90,
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    overflow: 'hidden',
-    ...shadows.glow,
-  },
-  fabGradient: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
+    textTransform: 'capitalize',
   },
 });
