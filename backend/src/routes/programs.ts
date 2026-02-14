@@ -480,20 +480,49 @@ export function register(app: App, fastify: FastifyInstance) {
           // The AI might have returned it in a different format
         }
 
+        // CRITICAL: Serialize programData to ensure JSONB is converted to plain JS object
+        // This prevents Postgres JSONB type issues in the API response
+        let serializedProgramData = programData;
+        try {
+          // Force serialization: stringify then parse to convert any Postgres JSONB to plain object
+          serializedProgramData = JSON.parse(JSON.stringify(programData));
+          app.logger.info(
+            {
+              programId: id,
+              serializedType: typeof serializedProgramData,
+              serializedKeys: Object.keys(serializedProgramData),
+              hasWeeks: !!serializedProgramData.weeks,
+              weeksCount: Array.isArray(serializedProgramData.weeks) ? serializedProgramData.weeks.length : 0,
+            },
+            'ProgramData serialized successfully'
+          );
+        } catch (serializeErr) {
+          app.logger.error(
+            { programId: id, err: serializeErr },
+            'Failed to serialize programData - using fallback'
+          );
+          serializedProgramData = {
+            weeksDuration: program.weeksDuration,
+            split: program.split,
+            weeks: Array.isArray(programData?.weeks) ? programData.weeks : [],
+          };
+        }
+
         const response = {
           ...program,
-          programData,
+          programData: serializedProgramData,
         };
 
         app.logger.info(
           {
             trainerId,
             programId: id,
-            hasWeeks: !!programData.weeks,
-            weeksCount: Array.isArray(programData.weeks) ? programData.weeks.length : 'N/A',
-            programDataKeys: Object.keys(programData),
+            responseProgramDataKeys: Object.keys(serializedProgramData),
+            hasWeeks: !!serializedProgramData.weeks,
+            weeksCount: Array.isArray(serializedProgramData.weeks) ? serializedProgramData.weeks.length : 0,
+            responseKeys: Object.keys(response),
           },
-          'Program details fetched successfully'
+          'Program details fetched successfully - response ready to send'
         );
 
         return response;
