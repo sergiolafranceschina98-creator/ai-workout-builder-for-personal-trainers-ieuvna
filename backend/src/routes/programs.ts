@@ -10,32 +10,31 @@ interface GenerateBody {
   clientId: string;
 }
 
-// Zod schema for AI-generated program structure
+// Zod schema for AI-generated program structure (simplified for reliability)
 const ExerciseSchema = z.object({
-  name: z.string().describe('Exercise name'),
-  sets: z.number().describe('Number of sets'),
-  reps: z.union([z.number(), z.string()]).describe('Reps per set, can be a range like "8-10"'),
-  rest: z.number().describe('Rest time in seconds'),
-  tempo: z.string().describe('Tempo format like "3-0-1-0"'),
-  notes: z.string().describe('Exercise notes or cues'),
+  name: z.string(),
+  sets: z.number(),
+  reps: z.string(),
+  rest: z.number(),
+  tempo: z.string(),
+  notes: z.string(),
 });
 
 const WorkoutSchema = z.object({
-  day: z.string().describe('Workout day name or number'),
-  exercises: z.array(ExerciseSchema).describe('Array of exercises for this workout'),
+  day: z.string(),
+  exercises: z.array(ExerciseSchema),
 });
 
 const WeekSchema = z.object({
-  week: z.number().describe('Week number in the program'),
-  phase: z.string().describe('Training phase: hypertrophy, strength, power, deload, endurance'),
-  workouts: z.array(WorkoutSchema).describe('Workouts for this week'),
+  week: z.number(),
+  phase: z.string(),
+  workouts: z.array(WorkoutSchema),
 });
 
 const ProgramDataSchema = z.object({
-  weeksDuration: z.number().describe('Total duration in weeks'),
-  split: z.string().describe('Training split type'),
-  weeks: z.array(WeekSchema).describe('Array of week objects'),
-  exercises: z.array(ExerciseSchema).describe('All exercises in the program'),
+  weeksDuration: z.number(),
+  split: z.string(),
+  weeks: z.array(WeekSchema),
 });
 
 type ProgramData = z.infer<typeof ProgramDataSchema>;
@@ -112,19 +111,19 @@ export function register(app: App, fastify: FastifyInstance) {
           'Step 1 COMPLETE: Client data fetched successfully'
         );
 
-        // Step 2: Build prompt (simplified for faster generation)
+        // Step 2: Build prompt (simplified for faster and more reliable generation)
         app.logger.info({ clientId }, 'Step 2: Building AI prompt');
-        const systemPrompt = `You are a strength coach. Generate an 8-week periodized workout program. Return JSON with: weeksDuration, split, weeks (array with week, phase, workouts), exercises (array with name, sets, reps, rest, tempo, notes). Each exercise must have brief notes with form cues.`;
+        const systemPrompt = `You are a strength coach. Generate a periodized workout program. Return structured JSON.`;
 
-        const userPrompt = `Generate an 8-week ${client.trainingFrequency}x/week workout program for a ${client.experience} lifter. Goal: ${client.goals}. Equipment: ${client.equipment}. Sessions: ${client.timePerSession} min. Injuries: ${client.injuries || 'none'}. Include rep ranges (e.g. "8-10"), rest times in seconds (e.g. 90), and form notes.`;
+        const userPrompt = `Create an 8-week ${client.trainingFrequency}x/week program for ${client.experience} level. Goal: ${client.goals}. Equipment: ${client.equipment}. Session length: ${client.timePerSession}min. Injuries: ${client.injuries || 'none'}.`;
 
         app.logger.info({ clientId }, 'Step 2 COMPLETE: Prompt built successfully');
 
-        // Step 3: Call AI with retry logic (120 second timeout, 3 retries with exponential backoff)
+        // Step 3: Call AI with retry logic (120 second timeout, 3 retries with increased delays)
         app.logger.info({ clientId }, 'Step 3: Calling AI to generate program (3 retries, 120s timeout)');
         let programData: ProgramData | null = null;
         const maxRetries = 3;
-        const retryDelays = [2000, 5000, 10000]; // 2s, 5s, 10s in milliseconds
+        const retryDelays = [3000, 8000, 15000]; // 3s, 8s, 15s in milliseconds
 
         for (let attemptNumber = 1; attemptNumber <= maxRetries; attemptNumber++) {
           try {
@@ -147,7 +146,7 @@ export function register(app: App, fastify: FastifyInstance) {
             // Race the AI generation against the timeout
             const aiPromise = (async () => {
               const { object } = await generateObject({
-                model: gateway('google/gemini-3-pro'),
+                model: gateway('google/gemini-3-flash'),
                 schema: ProgramDataSchema,
                 schemaName: 'WorkoutProgram',
                 schemaDescription: 'Periodized workout program',
@@ -165,7 +164,6 @@ export function register(app: App, fastify: FastifyInstance) {
                 attemptNumber,
                 weeksDuration: programData.weeksDuration,
                 split: programData.split,
-                exerciseCount: programData.exercises.length,
               },
               'Step 3 COMPLETE: AI generated program successfully'
             );
@@ -197,7 +195,7 @@ export function register(app: App, fastify: FastifyInstance) {
 
               return reply.status(500).send({
                 success: false,
-                error: 'AI generation is currently experiencing high demand. Please try again in a few moments.',
+                error: 'AI generation failed after 3 attempts. The AI service may be experiencing high load. Please try again in a moment.',
               });
             }
 
@@ -219,7 +217,7 @@ export function register(app: App, fastify: FastifyInstance) {
           );
           return reply.status(500).send({
             success: false,
-            error: 'AI generation is currently experiencing high demand. Please try again in a few moments.',
+            error: 'AI generation failed after 3 attempts. The AI service may be experiencing high load. Please try again in a moment.',
           });
         }
 
