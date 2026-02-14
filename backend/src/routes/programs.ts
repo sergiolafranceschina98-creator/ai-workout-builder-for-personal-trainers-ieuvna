@@ -422,27 +422,62 @@ export function register(app: App, fastify: FastifyInstance) {
           return reply.status(404).send({ error: 'Program not found' });
         }
 
+        // Get raw programData and debug it
+        app.logger.info(
+          {
+            programId: id,
+            rawProgramDataType: typeof program.programData,
+            rawProgramDataKeys: program.programData ? Object.keys(program.programData) : [],
+            rawProgramDataValue: JSON.stringify(program.programData).substring(0, 200),
+          },
+          'Raw programData from database'
+        );
+
         // Ensure programData has required structure
         let programData = program.programData as any;
 
         // If it's a string, parse it (for backward compatibility)
         if (typeof programData === 'string') {
           try {
+            app.logger.info({ programId: id }, 'Parsing programData from string');
             programData = JSON.parse(programData);
           } catch (e) {
-            app.logger.warn({ programId: id }, 'Failed to parse programData string');
+            app.logger.error({ programId: id, err: e }, 'Failed to parse programData string');
             programData = {};
           }
         }
 
+        // Log after parsing
+        app.logger.info(
+          {
+            programId: id,
+            programDataType: typeof programData,
+            programDataKeys: programData ? Object.keys(programData) : [],
+            hasWeeks: !!programData?.weeks,
+            weeksIsArray: Array.isArray(programData?.weeks),
+          },
+          'ProgramData after string check'
+        );
+
         // Validate that programData has weeks array
-        if (!programData || typeof programData !== 'object' || !Array.isArray(programData.weeks)) {
-          app.logger.warn({ programId: id, programData }, 'Invalid programData structure - missing weeks');
+        if (!programData || typeof programData !== 'object') {
+          app.logger.warn({ programId: id }, 'Invalid programData - not an object');
           programData = {
             weeksDuration: program.weeksDuration,
             split: program.split,
             weeks: [],
           };
+        } else if (!Array.isArray(programData.weeks)) {
+          app.logger.warn(
+            {
+              programId: id,
+              weeksType: typeof programData.weeks,
+              weeksValue: JSON.stringify(programData.weeks).substring(0, 100),
+            },
+            'Invalid programData - weeks is not an array'
+          );
+          // Don't override if weeks exists but is not an array - just log it
+          // The AI might have returned it in a different format
         }
 
         const response = {
@@ -451,7 +486,13 @@ export function register(app: App, fastify: FastifyInstance) {
         };
 
         app.logger.info(
-          { trainerId, programId: id, hasWeeks: !!programData.weeks, weeksCount: programData.weeks?.length },
+          {
+            trainerId,
+            programId: id,
+            hasWeeks: !!programData.weeks,
+            weeksCount: Array.isArray(programData.weeks) ? programData.weeks.length : 'N/A',
+            programDataKeys: Object.keys(programData),
+          },
           'Program details fetched successfully'
         );
 
