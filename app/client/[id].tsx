@@ -46,6 +46,7 @@ export default function ClientDetailScreen() {
   const [programs, setPrograms] = useState<Program[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [generatingProgress, setGeneratingProgress] = useState('');
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [successModalVisible, setSuccessModalVisible] = useState(false);
   const [errorModalVisible, setErrorModalVisible] = useState(false);
@@ -87,25 +88,61 @@ export default function ClientDetailScreen() {
   const handleGenerateProgram = async () => {
     console.log('User tapped Generate Program button');
     setGenerating(true);
+    setGeneratingProgress('Analyzing client profile...');
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    const progressMessages = [
+      'Analyzing client profile...',
+      'Consulting AI fitness expert...',
+      'Designing workout split...',
+      'Creating exercise selection...',
+      'Building progressive overload...',
+      'Finalizing program structure...',
+    ];
+
+    let messageIndex = 0;
+    const progressInterval = setInterval(() => {
+      messageIndex = (messageIndex + 1) % progressMessages.length;
+      setGeneratingProgress(progressMessages[messageIndex]);
+    }, 8000);
 
     try {
       const { authenticatedPost } = await import('@/utils/api');
       console.log('[ClientDetail] Calling AI program generation API...');
+      
       const result = await authenticatedPost('/api/programs/generate', { clientId: id });
+      
+      clearInterval(progressInterval);
       console.log('[ClientDetail] Program generated successfully:', result);
       
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       await fetchClientPrograms();
       setGenerating(false);
+      setGeneratingProgress('');
       setSuccessModalVisible(true);
     } catch (error: any) {
+      clearInterval(progressInterval);
       console.error('[ClientDetail] Error generating program:', error);
-      const errorMessage = error?.message || 'Failed to generate program. Please try again.';
-      console.error('[ClientDetail] Error message:', errorMessage);
+      
+      let errorMsg = 'Failed to generate program. Please try again.';
+      
+      if (error?.message) {
+        if (error.message.includes('timeout') || error.message.includes('timed out')) {
+          errorMsg = 'AI generation timed out. This can happen during high demand. Please try again in a moment.';
+        } else if (error.message.includes('AI generation failed')) {
+          errorMsg = error.message;
+        } else if (error.message.includes('API error')) {
+          errorMsg = 'Server error occurred. Please try again.';
+        } else {
+          errorMsg = error.message;
+        }
+      }
+      
+      console.error('[ClientDetail] Error message:', errorMsg);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setGenerating(false);
-      setErrorMessage(errorMessage);
+      setGeneratingProgress('');
+      setErrorMessage(errorMsg);
       setErrorModalVisible(true);
     }
   };
@@ -435,10 +472,14 @@ export default function ClientDetailScreen() {
             activeOpacity={0.7}
           >
             {generating ? (
-              <>
+              <View style={styles.generatingContainer}>
                 <ActivityIndicator color="#FFFFFF" />
-                <Text style={styles.generateButtonText}>Generating...</Text>
-              </>
+                <View style={styles.generatingTextContainer}>
+                  <Text style={styles.generateButtonText}>Generating Program...</Text>
+                  <Text style={styles.generatingProgressText}>{generatingProgress}</Text>
+                  <Text style={styles.generatingHintText}>This may take 30-90 seconds</Text>
+                </View>
+              </View>
             ) : (
               <>
                 <IconSymbol
@@ -734,14 +775,35 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginTop: 8,
     gap: 8,
+    minHeight: 56,
   },
   generateButtonDisabled: {
-    opacity: 0.6,
+    opacity: 0.9,
   },
   generateButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+  },
+  generatingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  generatingTextContainer: {
+    alignItems: 'flex-start',
+  },
+  generatingProgressText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    marginTop: 4,
+    opacity: 0.9,
+  },
+  generatingHintText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    marginTop: 2,
+    opacity: 0.7,
   },
   deleteButton: {
     flexDirection: 'row',
