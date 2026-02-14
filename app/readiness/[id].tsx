@@ -61,12 +61,10 @@ export default function ReadinessScreen() {
       const clientData = await authenticatedGet<Client>(`/api/clients/${id}`);
       setClient(clientData);
 
-      // TODO: Backend Integration - GET /api/clients/:clientId/readiness/latest → { id, date, score, recommendation } or null
       const latestData = await authenticatedGet<ReadinessScore | null>(`/api/clients/${id}/readiness/latest`);
       console.log('[Readiness] Fetched latest score:', latestData);
       setLatestScore(latestData);
 
-      // TODO: Backend Integration - GET /api/clients/:clientId/readiness → [{ id, date, score, recommendation, sleepHours, stressLevel, muscleSoreness, energyLevel }]
       const historyData = await authenticatedGet<ReadinessScore[]>(`/api/clients/${id}/readiness`);
       console.log('[Readiness] Fetched history:', historyData);
       setHistory(historyData);
@@ -99,7 +97,6 @@ export default function ReadinessScreen() {
 
       console.log('[Readiness] Submitting readiness check:', readinessData);
 
-      // TODO: Backend Integration - POST /api/clients/:clientId/readiness with { date (ISO 8601), sleepHours, stressLevel, muscleSoreness, energyLevel } → { id, clientId, date, sleepHours, stressLevel, muscleSoreness, energyLevel, score, recommendation, createdAt }
       const result = await authenticatedPost(`/api/clients/${id}/readiness`, readinessData);
       console.log('[Readiness] Readiness score calculated:', result);
 

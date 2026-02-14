@@ -62,7 +62,6 @@ export default function SessionDetailScreen() {
     try {
       const { authenticatedGet } = await import('@/utils/api');
       
-      // TODO: Backend Integration - GET /api/sessions/:sessionId → { id, sessionDate, weekNumber, dayName, completed, notes, exercises: [{ id, exerciseName, setsCompleted, repsCompleted, weightUsed, rpe, notes }] }
       const data = await authenticatedGet<Session>(`/api/sessions/${id}`);
       console.log('[SessionDetail] Fetched session:', data);
       setSession(data);
@@ -98,7 +97,6 @@ export default function SessionDetailScreen() {
 
       console.log('[SessionDetail] Adding exercise:', exerciseData);
 
-      // TODO: Backend Integration - POST /api/sessions/:sessionId/exercises with { exerciseName, setsCompleted, repsCompleted, weightUsed, rpe?, notes? } → created exercise log
       const result = await authenticatedPost(`/api/sessions/${id}/exercises`, exerciseData);
       console.log('[SessionDetail] Exercise added:', result);
 
@@ -127,7 +125,6 @@ export default function SessionDetailScreen() {
     try {
       const { authenticatedPut } = await import('@/utils/api');
 
-      // TODO: Backend Integration - PUT /api/sessions/:sessionId with { completed: true } → updated session
       const result = await authenticatedPut(`/api/sessions/${id}`, { completed: true });
       console.log('[SessionDetail] Session completed:', result);
 

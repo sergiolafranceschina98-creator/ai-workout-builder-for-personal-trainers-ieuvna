@@ -58,7 +58,6 @@ export default function NutritionScreen() {
       const clientData = await authenticatedGet<Client>(`/api/clients/${id}`);
       setClient(clientData);
 
-      // TODO: Backend Integration - GET /api/clients/:clientId/nutrition → { id, calories, protein, carbohydrates, fats, mealSuggestions, notes, createdAt } or null
       const nutritionData = await authenticatedGet<NutritionPlan | null>(`/api/clients/${id}/nutrition`);
       console.log('[Nutrition] Fetched nutrition plan:', nutritionData);
       setNutritionPlan(nutritionData);
@@ -93,7 +92,6 @@ export default function NutritionScreen() {
 
       console.log('[Nutrition] Generating nutrition plan:', requestData);
 
-      // TODO: Backend Integration - POST /api/clients/:clientId/nutrition with { goal, weight, height, age, gender, activityLevel } → { id, clientId, calories, protein, carbohydrates, fats, mealSuggestions, notes, createdAt }
       const result = await authenticatedPost(`/api/clients/${id}/nutrition`, requestData);
       console.log('[Nutrition] Nutrition plan generated:', result);
 

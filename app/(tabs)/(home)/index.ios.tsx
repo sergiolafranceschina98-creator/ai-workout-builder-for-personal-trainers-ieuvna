@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { IconSymbol } from '@/components/IconSymbol';
 import { colors, shadows } from '@/styles/commonStyles';
 import { useAuth } from '@/contexts/AuthContext';
@@ -55,6 +55,16 @@ export default function HomeScreen() {
       fetchClients();
     }
   }, [user]);
+
+  // Refresh client list when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      console.log('[Home] Screen focused - refreshing client list');
+      if (user) {
+        fetchClients();
+      }
+    }, [user])
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);

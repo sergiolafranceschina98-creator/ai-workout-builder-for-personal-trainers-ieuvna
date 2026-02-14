@@ -111,7 +111,6 @@ export default function ProgramDetailScreen() {
 
       console.log('[ProgramDetail] Requesting exercise alternatives:', swapRequest);
 
-      // TODO: Backend Integration - POST /api/exercises/swap with { originalExerciseName, clientId, muscleGroup?, equipment?, injuries? } → { alternatives: [{ name, muscleGroup, equipment, difficulty, reason }] }
       const result = await authenticatedPost<{ alternatives: ExerciseAlternative[] }>('/api/exercises/swap', swapRequest);
       console.log('[ProgramDetail] Received alternatives:', result);
 

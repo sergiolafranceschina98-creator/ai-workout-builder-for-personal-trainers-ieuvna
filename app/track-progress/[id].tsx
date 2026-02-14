@@ -58,7 +58,6 @@ export default function TrackProgressScreen() {
       const clientData = await authenticatedGet<Client>(`/api/clients/${id}`);
       setClient(clientData);
 
-      // TODO: Backend Integration - GET /api/clients/:clientId/sessions → [{ id, sessionDate, weekNumber, dayName, completed, notes, exerciseCount }]
       const sessionsData = await authenticatedGet<WorkoutSession[]>(`/api/clients/${id}/sessions`);
       console.log('[TrackProgress] Fetched sessions:', sessionsData);
       setSessions(sessionsData);
@@ -94,7 +93,6 @@ export default function TrackProgressScreen() {
 
       console.log('[TrackProgress] Creating session:', sessionData);
 
-      // TODO: Backend Integration - POST /api/clients/:clientId/sessions with { programId, sessionDate (ISO 8601), weekNumber, dayName, notes? } → { id, clientId, programId, sessionDate, weekNumber, dayName, completed, notes, createdAt }
       const result = await authenticatedPost(`/api/clients/${id}/sessions`, sessionData);
       console.log('[TrackProgress] Session created:', result);
 
