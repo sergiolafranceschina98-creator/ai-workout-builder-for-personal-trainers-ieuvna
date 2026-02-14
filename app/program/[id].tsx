@@ -67,25 +67,53 @@ export default function ProgramDetailScreen() {
   }, [id]);
 
   const fetchProgramDetails = async () => {
-    console.log('Fetching program details for:', id);
+    console.log('[ProgramDetail] Fetching program details for:', id);
     try {
       const { authenticatedGet } = await import('@/utils/api');
       const data = await authenticatedGet<any>(`/api/programs/${id}`);
       console.log('[ProgramDetail] Fetched program:', data);
+      console.log('[ProgramDetail] programData:', data.programData);
+      console.log('[ProgramDetail] programData type:', typeof data.programData);
+      
+      // Backend now returns programData as a parsed object, but handle string fallback for compatibility
+      let programData = data.programData;
+      if (typeof programData === 'string') {
+        try {
+          programData = JSON.parse(programData);
+          console.log('[ProgramDetail] Parsed programData from string (legacy):', programData);
+        } catch (parseError) {
+          console.error('[ProgramDetail] Failed to parse programData:', parseError);
+          programData = { weeks: [] };
+        }
+      }
+      
+      // Validate programData structure
+      if (!programData || typeof programData !== 'object') {
+        console.error('[ProgramDetail] Invalid programData structure:', programData);
+        programData = { weeks: [] };
+      }
       
       // Transform the API response to match the expected Program interface
       const transformedProgram: Program = {
         id: data.id,
         weeksDuration: data.weeksDuration,
         split: data.split,
-        weeks: data.programData?.weeks || [],
+        weeks: Array.isArray(programData.weeks) ? programData.weeks : [],
         clientId: data.clientId,
       };
+      
+      console.log('[ProgramDetail] Transformed program:', {
+        id: transformedProgram.id,
+        weeksDuration: transformedProgram.weeksDuration,
+        split: transformedProgram.split,
+        weeksCount: transformedProgram.weeks.length,
+        hasWorkouts: transformedProgram.weeks.length > 0 && transformedProgram.weeks[0].workouts?.length > 0,
+      });
       
       setProgram(transformedProgram);
       setLoading(false);
     } catch (error) {
-      console.error('Error fetching program details:', error);
+      console.error('[ProgramDetail] Error fetching program details:', error);
       setProgram(null);
       setLoading(false);
     }
@@ -162,6 +190,47 @@ export default function ProgramDetailScreen() {
           <Text style={[styles.errorText, { color: theme.colors.text }]}>
             Program not found
           </Text>
+        </View>
+      </>
+    );
+  }
+
+  // Check if program has no weeks (empty program data)
+  if (program.weeks.length === 0) {
+    return (
+      <>
+        <Stack.Screen
+          options={{
+            title: 'Workout Program',
+            presentation: 'modal',
+          }}
+        />
+        <View style={[styles.container, styles.centerContent, { backgroundColor: theme.colors.background }]}>
+          <IconSymbol
+            ios_icon_name="exclamationmark.triangle"
+            android_material_icon_name="warning"
+            size={64}
+            color={colors.accent}
+          />
+          <Text style={[styles.errorText, { color: theme.colors.text }]}>
+            Program Data Not Available
+          </Text>
+          <Text style={[styles.errorSubtext, { color: colors.textSecondary }]}>
+            This program was generated but the workout data could not be loaded.
+          </Text>
+          <Text style={[styles.errorSubtext, { color: colors.textSecondary }]}>
+            This may have been caused by a temporary issue during generation.
+          </Text>
+          <Text style={[styles.errorSubtext, { color: colors.textSecondary }]}>
+            Please try generating a new program for this client.
+          </Text>
+          <TouchableOpacity
+            style={[styles.backButton, { backgroundColor: colors.primary }]}
+            onPress={() => router.back()}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.backButtonText}>Go Back</Text>
+          </TouchableOpacity>
         </View>
       </>
     );
@@ -424,6 +493,24 @@ const styles = StyleSheet.create({
   errorText: {
     marginTop: 16,
     fontSize: 18,
+    fontWeight: '600',
+  },
+  errorSubtext: {
+    marginTop: 8,
+    fontSize: 14,
+    textAlign: 'center',
+    paddingHorizontal: 32,
+  },
+  backButton: {
+    marginTop: 24,
+    paddingHorizontal: 32,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  backButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
   header: {
     alignItems: 'center',
