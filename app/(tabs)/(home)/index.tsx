@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { IconSymbol } from '@/components/IconSymbol';
-import ProgressRing from '@/components/ProgressRing';
 import { colors, shadows } from '@/styles/commonStyles';
 import { useRouter, useFocusEffect } from 'expo-router';
 import React, { useState, useCallback } from 'react';
@@ -225,6 +224,10 @@ export default function HomeScreen() {
       strength: 'Strength',
       rehab: 'Rehabilitation',
       sport_specific: 'Sport Performance',
+      'Muscle Growth': 'Muscle Growth',
+      'Fat Loss': 'Fat Loss',
+      'Strength': 'Strength',
+      'Endurance': 'Endurance',
     };
     return goalMap[goal] || goal;
   };
@@ -239,6 +242,8 @@ export default function HomeScreen() {
 
   const totalClients = clients.length;
   const activeClients = clients.length;
+  const totalClientsText = totalClients.toString();
+  const activeClientsText = activeClients.toString();
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -264,13 +269,13 @@ export default function HomeScreen() {
         <View style={styles.statsContainer}>
           <StatCard
             title="Total Clients"
-            value={totalClients.toString()}
+            value={totalClientsText}
             icon="group"
             color={colors.primary}
           />
           <StatCard
             title="Active"
-            value={activeClients.toString()}
+            value={activeClientsText}
             icon="fitness-center"
             color={colors.success}
           />

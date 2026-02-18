@@ -10,7 +10,7 @@ interface StatCardProps {
   value: string | number;
   subtitle?: string;
   icon?: string;
-  iconColor?: string;
+  color?: string;
   gradient?: boolean;
   style?: ViewStyle;
 }
@@ -20,25 +20,28 @@ export default function StatCard({
   value,
   subtitle,
   icon,
-  iconColor = colors.primary,
+  color = colors.primary,
   gradient = false,
   style,
 }: StatCardProps) {
+  const valueText = typeof value === 'number' ? value.toString() : value;
+  const iconColorWithOpacity = `${color}20`;
+  
   const content = (
     <View style={styles.content}>
       {icon && (
-        <View style={[styles.iconContainer, { backgroundColor: iconColor + '20' }]}>
+        <View style={[styles.iconContainer, { backgroundColor: iconColorWithOpacity }]}>
           <IconSymbol
             ios_icon_name={icon}
             android_material_icon_name={icon}
             size={24}
-            color={iconColor}
+            color={color}
           />
         </View>
       )}
       <View style={styles.textContainer}>
         <Text style={styles.title}>{title}</Text>
-        <Text style={styles.value}>{value}</Text>
+        <Text style={styles.value}>{valueText}</Text>
         {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
       </View>
     </View>
@@ -66,9 +69,10 @@ export default function StatCard({
 
 const styles = StyleSheet.create({
   card: {
+    flex: 1,
     backgroundColor: colors.card,
     borderRadius: 16,
-    padding: 20,
+    padding: 16,
     borderWidth: 1,
     borderColor: colors.border,
     ...shadows.small,
@@ -78,28 +82,28 @@ const styles = StyleSheet.create({
     ...shadows.glow,
   },
   content: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
   },
   iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginBottom: 12,
   },
   textContainer: {
     flex: 1,
   },
   title: {
-    fontSize: 14,
+    fontSize: 13,
     color: colors.textSecondary,
     marginBottom: 4,
     fontWeight: '500',
   },
   value: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '700',
     color: colors.text,
     letterSpacing: -0.5,
