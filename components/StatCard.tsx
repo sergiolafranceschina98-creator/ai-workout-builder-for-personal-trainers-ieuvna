@@ -4,6 +4,7 @@ import { View, Text, StyleSheet, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { IconSymbol } from '@/components/IconSymbol';
 import { colors, shadows } from '@/styles/commonStyles';
+import { useTheme } from '@react-navigation/native';
 
 interface StatCardProps {
   title: string;
@@ -24,6 +25,7 @@ export default function StatCard({
   gradient = false,
   style,
 }: StatCardProps) {
+  const theme = useTheme();
   const valueText = typeof value === 'number' ? value.toString() : value;
   const iconColorWithOpacity = `${color}20`;
   
@@ -40,9 +42,9 @@ export default function StatCard({
         </View>
       )}
       <View style={styles.textContainer}>
-        <Text style={styles.title}>{title}</Text>
-        <Text style={styles.value}>{valueText}</Text>
-        {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
+        <Text style={[styles.title, { color: theme.colors.text, opacity: 0.6 }]}>{title}</Text>
+        <Text style={[styles.value, { color: theme.colors.text }]}>{valueText}</Text>
+        {subtitle && <Text style={[styles.subtitle, { color: theme.colors.text, opacity: 0.6 }]}>{subtitle}</Text>}
       </View>
     </View>
   );
@@ -50,7 +52,7 @@ export default function StatCard({
   if (gradient) {
     return (
       <LinearGradient
-        colors={[colors.gradientStart, colors.gradientEnd]}
+        colors={[colors.primary, colors.secondary]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[styles.card, styles.gradientCard, style]}
@@ -61,7 +63,7 @@ export default function StatCard({
   }
 
   return (
-    <View style={[styles.card, style]}>
+    <View style={[styles.card, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }, style]}>
       {content}
     </View>
   );
@@ -70,11 +72,9 @@ export default function StatCard({
 const styles = StyleSheet.create({
   card: {
     flex: 1,
-    backgroundColor: colors.card,
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: colors.border,
     ...shadows.small,
   },
   gradientCard: {
@@ -98,19 +98,16 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 13,
-    color: colors.textSecondary,
     marginBottom: 4,
     fontWeight: '500',
   },
   value: {
     fontSize: 24,
     fontWeight: '700',
-    color: colors.text,
     letterSpacing: -0.5,
   },
   subtitle: {
     fontSize: 12,
-    color: colors.textSecondary,
     marginTop: 2,
   },
 });

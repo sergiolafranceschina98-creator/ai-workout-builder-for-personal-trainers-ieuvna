@@ -9,7 +9,6 @@ import {
   RefreshControl,
   Platform,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { IconSymbol } from '@/components/IconSymbol';
 import { colors, shadows } from '@/styles/commonStyles';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -25,23 +24,10 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 100,
   },
-  header: {
-    paddingTop: Platform.OS === 'android' ? 48 : 60,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-  },
-  headerTitle: {
-    fontSize: 34,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  headerSubtitle: {
-    fontSize: 17,
-    opacity: 0.6,
-  },
   statsContainer: {
     flexDirection: 'row',
     paddingHorizontal: 20,
+    paddingTop: 20,
     marginBottom: 24,
     gap: 12,
   },
@@ -254,18 +240,6 @@ export default function HomeScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }
       >
-        <LinearGradient
-          colors={[colors.primary, colors.secondary]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.header}
-        >
-          <Text style={[styles.headerTitle, { color: '#fff' }]}>AI Workout Builder</Text>
-          <Text style={[styles.headerSubtitle, { color: '#fff' }]}>
-            Personalized training programs
-          </Text>
-        </LinearGradient>
-
         <View style={styles.statsContainer}>
           <StatCard
             title="Total Clients"

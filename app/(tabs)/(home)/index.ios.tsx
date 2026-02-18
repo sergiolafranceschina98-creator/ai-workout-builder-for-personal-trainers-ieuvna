@@ -8,7 +8,6 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { IconSymbol } from '@/components/IconSymbol';
 import { colors, shadows } from '@/styles/commonStyles';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -19,27 +18,15 @@ import { getAllClients, Client } from '@/utils/localStorage';
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#f2f2f7',
   },
   scrollContent: {
     paddingBottom: 100,
   },
-  header: {
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-  },
-  headerTitle: {
-    fontSize: 34,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  headerSubtitle: {
-    fontSize: 17,
-    opacity: 0.6,
-  },
   statsContainer: {
     flexDirection: 'row',
     paddingHorizontal: 20,
+    paddingTop: 20,
     marginBottom: 24,
     gap: 12,
   },
@@ -72,6 +59,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
+    backgroundColor: '#fff',
     ...shadows.medium,
   },
   clientHeader: {
@@ -87,10 +75,12 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '600',
     marginBottom: 4,
+    color: '#000',
   },
   clientMeta: {
     fontSize: 14,
     opacity: 0.6,
+    color: '#000',
   },
   experienceBadge: {
     paddingHorizontal: 12,
@@ -113,10 +103,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     opacity: 0.6,
     marginBottom: 4,
+    color: '#000',
   },
   detailValue: {
     fontSize: 15,
     fontWeight: '500',
+    color: '#000',
   },
   emptyState: {
     alignItems: 'center',
@@ -131,12 +123,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 8,
     textAlign: 'center',
+    color: '#000',
   },
   emptySubtitle: {
     fontSize: 16,
     opacity: 0.6,
     textAlign: 'center',
     marginBottom: 24,
+    color: '#000',
   },
   emptyButton: {
     flexDirection: 'row',
@@ -244,7 +238,7 @@ export default function HomeScreen() {
   const activeClientsText = activeClients.toString();
 
   return (
-    <View style={[styles.container, { backgroundColor: '#f2f2f7' }]}>
+    <View style={styles.container}>
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.scrollContent}
@@ -252,18 +246,6 @@ export default function HomeScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }
       >
-        <LinearGradient
-          colors={[colors.primary, colors.secondary]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.header}
-        >
-          <Text style={[styles.headerTitle, { color: '#fff' }]}>AI Workout Builder</Text>
-          <Text style={[styles.headerSubtitle, { color: '#fff' }]}>
-            Personalized training programs
-          </Text>
-        </LinearGradient>
-
         <View style={styles.statsContainer}>
           <StatCard
             title="Total Clients"
@@ -307,10 +289,10 @@ export default function HomeScreen() {
                   style={{ opacity: 0.3 }}
                 />
               </View>
-              <Text style={[styles.emptyTitle, { color: '#000' }]}>
+              <Text style={styles.emptyTitle}>
                 No Clients Yet
               </Text>
-              <Text style={[styles.emptySubtitle, { color: '#000' }]}>
+              <Text style={styles.emptySubtitle}>
                 Add your first client to start creating personalized workout programs
               </Text>
               <TouchableOpacity
@@ -338,15 +320,15 @@ export default function HomeScreen() {
               return (
                 <TouchableOpacity
                   key={client.id}
-                  style={[styles.clientCard, { backgroundColor: '#fff' }]}
+                  style={styles.clientCard}
                   onPress={() => handleClientPress(client.id)}
                 >
                   <View style={styles.clientHeader}>
                     <View style={styles.clientInfo}>
-                      <Text style={[styles.clientName, { color: '#000' }]}>
+                      <Text style={styles.clientName}>
                         {client.name}
                       </Text>
-                      <Text style={[styles.clientMeta, { color: '#000' }]}>
+                      <Text style={styles.clientMeta}>
                         {metaText}
                       </Text>
                     </View>
@@ -359,18 +341,18 @@ export default function HomeScreen() {
 
                   <View style={styles.clientDetails}>
                     <View style={styles.detailItem}>
-                      <Text style={[styles.detailLabel, { color: '#000' }]}>
+                      <Text style={styles.detailLabel}>
                         Goal
                       </Text>
-                      <Text style={[styles.detailValue, { color: '#000' }]}>
+                      <Text style={styles.detailValue}>
                         {goalText}
                       </Text>
                     </View>
                     <View style={styles.detailItem}>
-                      <Text style={[styles.detailLabel, { color: '#000' }]}>
+                      <Text style={styles.detailLabel}>
                         Frequency
                       </Text>
-                      <Text style={[styles.detailValue, { color: '#000' }]}>
+                      <Text style={styles.detailValue}>
                         {frequencyText}
                       </Text>
                     </View>
