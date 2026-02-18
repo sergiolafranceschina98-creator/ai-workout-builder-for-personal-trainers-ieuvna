@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,31 +11,22 @@ import {
   TextInput,
 } from 'react-native';
 import { useTheme } from '@react-navigation/native';
-import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
+import { useRouter, useLocalSearchParams, Stack, useFocusEffect } from 'expo-router';
 import { IconSymbol } from '@/components/IconSymbol';
 import { colors } from '@/styles/commonStyles';
 import * as Haptics from 'expo-haptics';
-
-interface Client {
-  id: string;
-  name: string;
-}
-
-interface ReadinessScore {
-  id: string;
-  date: string;
-  sleepHours: number;
-  stressLevel: string;
-  muscleSoreness: string;
-  energyLevel: string;
-  score: number;
-  recommendation: string;
-}
+import {
+  getClientById,
+  getReadinessByClientId,
+  createReadinessScore,
+  Client,
+  ReadinessScore,
+} from '@/utils/localStorage';
 
 export default function ReadinessScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const { id } = useLocalSearchParams();
+  const { id } = useLocalSearchParams<{ id: string }>();
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -49,45 +40,40 @@ export default function ReadinessScreen() {
   const [muscleSoreness, setMuscleSoreness] = useState<'none' | 'mild' | 'moderate' | 'severe'>('none');
   const [energyLevel, setEnergyLevel] = useState<'low' | 'medium' | 'high'>('high');
 
-  useEffect(() => {
-    fetchData();
-  }, [id]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     console.log('Fetching readiness data for client:', id);
     try {
-      const { authenticatedGet } = await import('@/utils/api');
-      
-      const clientData = await authenticatedGet<Client>(`/api/clients/${id}`);
+      const clientData = await getClientById(id);
       setClient(clientData);
 
-      const latestData = await authenticatedGet<ReadinessScore | null>(`/api/clients/${id}/readiness/latest`);
-      console.log('[Readiness] Fetched latest score:', latestData);
-      setLatestScore(latestData);
-
-      const historyData = await authenticatedGet<ReadinessScore[]>(`/api/clients/${id}/readiness`);
+      const historyData = await getReadinessByClientId(id);
       console.log('[Readiness] Fetched history:', historyData);
       setHistory(historyData);
-      
-      setLoading(false);
+      setLatestScore(historyData[0] || null);
     } catch (error) {
       console.error('Error fetching readiness data:', error);
       setLatestScore(null);
       setHistory([]);
+    } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchData();
+    }, [fetchData])
+  );
 
   const handleSubmitReadiness = async () => {
     console.log('User tapped Submit Readiness button');
 
     setSubmitting(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
-      const { authenticatedPost } = await import('@/utils/api');
-
       const readinessData = {
+        clientId: id,
         date: new Date().toISOString(),
         sleepHours: parseFloat(sleepHours),
         stressLevel,
@@ -97,10 +83,10 @@ export default function ReadinessScreen() {
 
       console.log('[Readiness] Submitting readiness check:', readinessData);
 
-      const result = await authenticatedPost(`/api/clients/${id}/readiness`, readinessData);
+      const result = await createReadinessScore(readinessData);
       console.log('[Readiness] Readiness score calculated:', result);
 
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setAddModalVisible(false);
       setSleepHours('7');
       setStressLevel('low');
@@ -109,7 +95,7 @@ export default function ReadinessScreen() {
       await fetchData();
     } catch (error) {
       console.error('Error submitting readiness check:', error);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setSubmitting(false);
     }

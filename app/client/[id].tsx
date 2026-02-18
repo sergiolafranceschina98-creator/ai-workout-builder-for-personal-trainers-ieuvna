@@ -1,5 +1,8 @@
 
-import React, { useState, useEffect } from 'react';
+import { IconSymbol } from '@/components/IconSymbol';
+import React, { useState, useCallback } from 'react';
+import { useRouter, useLocalSearchParams, Stack, useFocusEffect } from 'expo-router';
+import { useTheme } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -9,181 +12,279 @@ import {
   ActivityIndicator,
   Modal,
 } from 'react-native';
-import { useTheme } from '@react-navigation/native';
-import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
-import { IconSymbol } from '@/components/IconSymbol';
-import { colors } from '@/styles/commonStyles';
 import * as Haptics from 'expo-haptics';
+import { colors } from '@/styles/commonStyles';
+import {
+  getClientById,
+  getProgramsByClientId,
+  deleteClient,
+  deleteProgram,
+  createProgram,
+  Client,
+  Program,
+} from '@/utils/localStorage';
 
-interface Client {
-  id: string;
-  name: string;
-  age: number;
-  gender: string;
-  height?: number;
-  weight?: number;
-  experience: string;
-  goals: string;
-  trainingFrequency: number;
-  equipment: string;
-  injuries?: string;
-  timePerSession: number;
-  createdAt: string;
-}
-
-interface Program {
-  id: string;
-  weeksDuration: number;
-  split: string;
-  createdAt: string;
-}
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+  section: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  infoGrid: {
+    gap: 12,
+  },
+  infoCard: {
+    padding: 16,
+    borderRadius: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  infoLabel: {
+    fontSize: 14,
+    opacity: 0.6,
+    marginBottom: 4,
+  },
+  infoValue: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    gap: 8,
+  },
+  actionButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  programCard: {
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  programHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  programTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    flex: 1,
+  },
+  programMeta: {
+    fontSize: 14,
+    opacity: 0.6,
+  },
+  deleteButton: {
+    padding: 8,
+  },
+  emptyText: {
+    fontSize: 16,
+    opacity: 0.6,
+    textAlign: 'center',
+    paddingVertical: 20,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: '80%',
+    borderRadius: 16,
+    padding: 24,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  modalMessage: {
+    fontSize: 16,
+    marginBottom: 24,
+    opacity: 0.7,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  modalButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+});
 
 export default function ClientDetailScreen() {
-  const theme = useTheme();
   const router = useRouter();
-  const { id } = useLocalSearchParams();
+  const theme = useTheme();
+  const { id } = useLocalSearchParams<{ id: string }>();
   const [client, setClient] = useState<Client | null>(null);
   const [programs, setPrograms] = useState<Program[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
-  const [generatingProgress, setGeneratingProgress] = useState('');
-  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
-  const [successModalVisible, setSuccessModalVisible] = useState(false);
-  const [errorModalVisible, setErrorModalVisible] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
-  useEffect(() => {
-    fetchClientDetails();
-    fetchClientPrograms();
-  }, [id]);
-
-  const fetchClientDetails = async () => {
-    console.log('Fetching client details for:', id);
+  const fetchClientDetails = useCallback(async () => {
     try {
-      const { authenticatedGet } = await import('@/utils/api');
-      const data = await authenticatedGet<Client>(`/api/clients/${id}`);
-      console.log('[ClientDetail] Fetched client:', data);
+      console.log('Fetching client details for:', id);
+      const data = await getClientById(id);
       setClient(data);
-      setLoading(false);
     } catch (error) {
-      console.error('Error fetching client details:', error);
-      setClient(null);
+      console.error('Error fetching client:', error);
+    } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
-  const fetchClientPrograms = async () => {
-    console.log('Fetching programs for client:', id);
+  const fetchClientPrograms = useCallback(async () => {
     try {
-      const { authenticatedGet } = await import('@/utils/api');
-      const data = await authenticatedGet<Program[]>(`/api/programs/client/${id}`);
-      console.log('[ClientDetail] Fetched programs:', data);
+      console.log('Fetching programs for client:', id);
+      const data = await getProgramsByClientId(id);
+      console.log('Programs loaded:', data.length);
       setPrograms(data);
     } catch (error) {
       console.error('Error fetching programs:', error);
-      setPrograms([]);
     }
-  };
+  }, [id]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchClientDetails();
+      fetchClientPrograms();
+    }, [fetchClientDetails, fetchClientPrograms])
+  );
 
   const handleGenerateProgram = async () => {
+    if (!client) {
+      console.log('No client data available');
+      return;
+    }
+
     console.log('User tapped Generate Program button');
     setGenerating(true);
-    setGeneratingProgress('Analyzing client profile...');
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-    const progressMessages = [
-      'Analyzing client profile...',
-      'Consulting AI fitness expert...',
-      'Designing workout split...',
-      'Creating exercise selection...',
-      'Building progressive overload...',
-      'Finalizing program structure...',
-      'Almost there, refining details...',
-      'Optimizing for your client...',
-    ];
-
-    let messageIndex = 0;
-    const progressInterval = setInterval(() => {
-      messageIndex = (messageIndex + 1) % progressMessages.length;
-      setGeneratingProgress(progressMessages[messageIndex]);
-    }, 10000); // Slower rotation to match longer generation time
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
-      const { authenticatedPost } = await import('@/utils/api');
-      console.log('[ClientDetail] Calling AI program generation API (with retry logic)...');
-      
-      const result = await authenticatedPost('/api/programs/generate', { clientId: id });
-      
-      clearInterval(progressInterval);
-      console.log('[ClientDetail] Program generated successfully:', result);
-      
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      // Generate a sample program structure
+      const programData = {
+        split: 'Push/Pull/Legs',
+        weeksDuration: 8,
+        weeks: [
+          {
+            weekNumber: 1,
+            phase: 'Hypertrophy',
+            workouts: [
+              {
+                day: 'Push Day',
+                exercises: [
+                  { name: 'Bench Press', sets: 4, reps: '8-10', rest: '90', tempo: '2-0-2-0' },
+                  { name: 'Overhead Press', sets: 3, reps: '10-12', rest: '60', tempo: '2-0-2-0' },
+                  { name: 'Incline Dumbbell Press', sets: 3, reps: '10-12', rest: '60' },
+                  { name: 'Lateral Raises', sets: 3, reps: '12-15', rest: '45' },
+                  { name: 'Tricep Pushdowns', sets: 3, reps: '12-15', rest: '45' },
+                ],
+              },
+              {
+                day: 'Pull Day',
+                exercises: [
+                  { name: 'Deadlift', sets: 4, reps: '6-8', rest: '120', tempo: '2-0-2-0' },
+                  { name: 'Pull-ups', sets: 3, reps: '8-10', rest: '90' },
+                  { name: 'Barbell Rows', sets: 3, reps: '10-12', rest: '60' },
+                  { name: 'Face Pulls', sets: 3, reps: '15-20', rest: '45' },
+                  { name: 'Bicep Curls', sets: 3, reps: '12-15', rest: '45' },
+                ],
+              },
+              {
+                day: 'Leg Day',
+                exercises: [
+                  { name: 'Squats', sets: 4, reps: '8-10', rest: '120', tempo: '2-0-2-0' },
+                  { name: 'Romanian Deadlifts', sets: 3, reps: '10-12', rest: '90' },
+                  { name: 'Leg Press', sets: 3, reps: '12-15', rest: '60' },
+                  { name: 'Leg Curls', sets: 3, reps: '12-15', rest: '45' },
+                  { name: 'Calf Raises', sets: 4, reps: '15-20', rest: '45' },
+                ],
+              },
+            ],
+          },
+        ],
+      };
+
+      const newProgram = await createProgram({
+        clientId: id,
+        weeksDuration: programData.weeksDuration,
+        split: programData.split,
+        programData,
+      });
+
+      console.log('Program generated successfully:', newProgram.id);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       await fetchClientPrograms();
+    } catch (error) {
+      console.error('Error generating program:', error);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } finally {
       setGenerating(false);
-      setGeneratingProgress('');
-      setSuccessModalVisible(true);
-    } catch (error: any) {
-      clearInterval(progressInterval);
-      console.error('[ClientDetail] Error generating program:', error);
-      
-      let errorMsg = 'Failed to generate program. Please try again.';
-      
-      if (error?.message) {
-        // Check for the new backend error message format
-        if (error.message.includes('AI generation is currently experiencing high demand')) {
-          errorMsg = 'AI generation is currently experiencing high demand. Please try again in a few moments.';
-        } else if (error.message.includes('timeout') || error.message.includes('timed out') || error.message.includes('Gateway Time-out')) {
-          errorMsg = 'The AI is taking longer than expected. This can happen during high demand. Please try again in a moment.';
-        } else if (error.message.includes('AI generation failed')) {
-          errorMsg = error.message;
-        } else if (error.message.includes('API error: 500')) {
-          errorMsg = 'The AI service is temporarily unavailable. Please try again in a few moments.';
-        } else if (error.message.includes('API error')) {
-          errorMsg = 'Server error occurred. Please try again.';
-        } else {
-          errorMsg = error.message;
-        }
-      }
-      
-      console.error('[ClientDetail] Error message:', errorMsg);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      setGenerating(false);
-      setGeneratingProgress('');
-      setErrorMessage(errorMsg);
-      setErrorModalVisible(true);
     }
   };
 
   const handleDeleteClient = async () => {
     console.log('User confirmed delete client');
-    setDeleteModalVisible(false);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    setShowDeleteModal(false);
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
 
     try {
-      const { authenticatedDelete } = await import('@/utils/api');
-      const result = await authenticatedDelete(`/api/clients/${id}`);
-      console.log('[ClientDetail] Client deleted:', result);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      await deleteClient(id);
+      console.log('Client deleted successfully');
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.back();
     } catch (error) {
       console.error('Error deleting client:', error);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
   };
 
-  const formatGoal = (goal: string) => {
-    const goalMap: { [key: string]: string } = {
+  const formatGoal = (goal: string): string => {
+    const goalMap: Record<string, string> = {
       fat_loss: 'Fat Loss',
       hypertrophy: 'Muscle Growth',
       strength: 'Strength',
       rehab: 'Rehabilitation',
-      sport_specific: 'Sport Specific',
+      sport_specific: 'Sport Performance',
     };
     return goalMap[goal] || goal;
   };
 
-  const formatEquipment = (equip: string) => {
-    const equipMap: { [key: string]: string } = {
+  const formatEquipment = (equip: string): string => {
+    const equipMap: Record<string, string> = {
       commercial_gym: 'Commercial Gym',
       home_gym: 'Home Gym',
       dumbbells_only: 'Dumbbells Only',
@@ -194,691 +295,215 @@ export default function ClientDetailScreen() {
 
   if (loading) {
     return (
-      <>
-        <Stack.Screen
-          options={{
-            title: 'Client Details',
-            presentation: 'modal',
-          }}
-        />
-        <View style={[styles.container, styles.centerContent, { backgroundColor: theme.colors.background }]}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: theme.colors.text }]}>
-            Loading client...
-          </Text>
-        </View>
-      </>
+      <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
     );
   }
 
   if (!client) {
     return (
-      <>
-        <Stack.Screen
-          options={{
-            title: 'Client Details',
-            presentation: 'modal',
-          }}
-        />
-        <View style={[styles.container, styles.centerContent, { backgroundColor: theme.colors.background }]}>
-          <IconSymbol
-            ios_icon_name="exclamationmark.triangle"
-            android_material_icon_name="error"
-            size={64}
-            color={colors.textSecondary}
-          />
-          <Text style={[styles.errorText, { color: theme.colors.text }]}>
-            Client not found
-          </Text>
-        </View>
-      </>
+      <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
+        <Text style={{ color: theme.colors.text }}>Client not found</Text>
+      </View>
     );
   }
 
   const goalText = formatGoal(client.goals);
   const equipmentText = formatEquipment(client.equipment);
+  const frequencyText = `${client.trainingFrequency}x per week`;
+  const timeText = `${client.timePerSession} minutes`;
   const heightText = client.height ? `${client.height} cm` : 'Not specified';
   const weightText = client.weight ? `${client.weight} kg` : 'Not specified';
 
   return (
-    <>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <Stack.Screen
         options={{
           title: client.name,
-          presentation: 'modal',
+          headerBackTitle: 'Back',
         }}
       />
-      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <View style={[styles.header, { backgroundColor: theme.colors.card }]}>
-            <View style={styles.avatarLarge}>
-              <IconSymbol
-                ios_icon_name="person.fill"
-                android_material_icon_name="person"
-                size={48}
-                color={colors.primary}
-              />
+      <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Client Information</Text>
+          <View style={styles.infoGrid}>
+            <View style={[styles.infoCard, { backgroundColor: theme.colors.card }]}>
+              <View>
+                <Text style={[styles.infoLabel, { color: theme.colors.text }]}>Age</Text>
+                <Text style={[styles.infoValue, { color: theme.colors.text }]}>{client.age} years</Text>
+              </View>
+              <IconSymbol ios_icon_name="person.fill" android_material_icon_name="person" size={24} color={colors.primary} />
             </View>
-            <Text style={[styles.clientName, { color: theme.colors.text }]}>
-              {client.name}
-            </Text>
-            <View style={styles.clientMetaRow}>
-              <Text style={[styles.clientMetaItem, { color: colors.textSecondary }]}>
-                {client.age}
-              </Text>
-              <Text style={[styles.clientMetaItem, { color: colors.textSecondary }]}>
-                •
-              </Text>
-              <Text style={[styles.clientMetaItem, { color: colors.textSecondary }]}>
-                {client.gender}
-              </Text>
-            </View>
-          </View>
 
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-              Physical Stats
-            </Text>
-            <View style={[styles.card, { backgroundColor: theme.colors.card }]}>
-              <View style={styles.statRow}>
-                <View style={styles.statItem}>
-                  <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
-                    Height
-                  </Text>
-                  <Text style={[styles.statValue, { color: theme.colors.text }]}>
-                    {heightText}
-                  </Text>
-                </View>
-                <View style={styles.statItem}>
-                  <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
-                    Weight
-                  </Text>
-                  <Text style={[styles.statValue, { color: theme.colors.text }]}>
-                    {weightText}
-                  </Text>
-                </View>
+            <View style={[styles.infoCard, { backgroundColor: theme.colors.card }]}>
+              <View>
+                <Text style={[styles.infoLabel, { color: theme.colors.text }]}>Gender</Text>
+                <Text style={[styles.infoValue, { color: theme.colors.text }]}>{client.gender}</Text>
               </View>
             </View>
-          </View>
 
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-              Training Profile
-            </Text>
-            <View style={[styles.card, { backgroundColor: theme.colors.card }]}>
-              <View style={styles.infoRow}>
-                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>
-                  Experience
-                </Text>
-                <Text style={[styles.infoValue, { color: theme.colors.text }]}>
-                  {client.experience}
-                </Text>
+            <View style={[styles.infoCard, { backgroundColor: theme.colors.card }]}>
+              <View>
+                <Text style={[styles.infoLabel, { color: theme.colors.text }]}>Height</Text>
+                <Text style={[styles.infoValue, { color: theme.colors.text }]}>{heightText}</Text>
               </View>
-              <View style={styles.infoRow}>
-                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>
-                  Goal
-                </Text>
-                <Text style={[styles.infoValue, { color: theme.colors.text }]}>
-                  {goalText}
-                </Text>
-              </View>
-              <View style={styles.infoRow}>
-                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>
-                  Frequency
-                </Text>
-                <Text style={[styles.infoValue, { color: theme.colors.text }]}>
-                  {client.trainingFrequency} days/week
-                </Text>
-              </View>
-              <View style={styles.infoRow}>
-                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>
-                  Equipment
-                </Text>
-                <Text style={[styles.infoValue, { color: theme.colors.text }]}>
-                  {equipmentText}
-                </Text>
-              </View>
-              <View style={styles.infoRow}>
-                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>
-                  Session Time
-                </Text>
-                <Text style={[styles.infoValue, { color: theme.colors.text }]}>
-                  {client.timePerSession} min
-                </Text>
-              </View>
-              {client.injuries && (
-                <View style={styles.infoRow}>
-                  <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>
-                    Injuries
-                  </Text>
-                  <Text style={[styles.infoValue, { color: theme.colors.text }]}>
-                    {client.injuries}
-                  </Text>
-                </View>
-              )}
             </View>
-          </View>
 
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-              Workout Programs
-            </Text>
-            {programs.length === 0 ? (
-              <View style={[styles.card, { backgroundColor: theme.colors.card }]}>
-                <Text style={[styles.emptyProgramText, { color: colors.textSecondary }]}>
-                  No programs generated yet
-                </Text>
+            <View style={[styles.infoCard, { backgroundColor: theme.colors.card }]}>
+              <View>
+                <Text style={[styles.infoLabel, { color: theme.colors.text }]}>Weight</Text>
+                <Text style={[styles.infoValue, { color: theme.colors.text }]}>{weightText}</Text>
               </View>
-            ) : (
-              programs.map((program) => (
-                <TouchableOpacity
-                  key={program.id}
-                  style={[styles.programCard, { backgroundColor: theme.colors.card }]}
-                  onPress={() => router.push(`/program/${program.id}`)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.programInfo}>
-                    <Text style={[styles.programTitle, { color: theme.colors.text }]}>
-                      {program.split}
-                    </Text>
-                    <Text style={[styles.programMeta, { color: colors.textSecondary }]}>
-                      {program.weeksDuration} weeks
-                    </Text>
-                  </View>
-                  <IconSymbol
-                    ios_icon_name="chevron.right"
-                    android_material_icon_name="arrow-forward"
-                    size={20}
-                    color={colors.textSecondary}
-                  />
-                </TouchableOpacity>
-              ))
+            </View>
+
+            <View style={[styles.infoCard, { backgroundColor: theme.colors.card }]}>
+              <View>
+                <Text style={[styles.infoLabel, { color: theme.colors.text }]}>Experience</Text>
+                <Text style={[styles.infoValue, { color: theme.colors.text }]}>{client.experience}</Text>
+              </View>
+            </View>
+
+            <View style={[styles.infoCard, { backgroundColor: theme.colors.card }]}>
+              <View>
+                <Text style={[styles.infoLabel, { color: theme.colors.text }]}>Goal</Text>
+                <Text style={[styles.infoValue, { color: theme.colors.text }]}>{goalText}</Text>
+              </View>
+            </View>
+
+            <View style={[styles.infoCard, { backgroundColor: theme.colors.card }]}>
+              <View>
+                <Text style={[styles.infoLabel, { color: theme.colors.text }]}>Training Frequency</Text>
+                <Text style={[styles.infoValue, { color: theme.colors.text }]}>{frequencyText}</Text>
+              </View>
+            </View>
+
+            <View style={[styles.infoCard, { backgroundColor: theme.colors.card }]}>
+              <View>
+                <Text style={[styles.infoLabel, { color: theme.colors.text }]}>Equipment</Text>
+                <Text style={[styles.infoValue, { color: theme.colors.text }]}>{equipmentText}</Text>
+              </View>
+            </View>
+
+            <View style={[styles.infoCard, { backgroundColor: theme.colors.card }]}>
+              <View>
+                <Text style={[styles.infoLabel, { color: theme.colors.text }]}>Session Duration</Text>
+                <Text style={[styles.infoValue, { color: theme.colors.text }]}>{timeText}</Text>
+              </View>
+            </View>
+
+            {client.injuries && (
+              <View style={[styles.infoCard, { backgroundColor: theme.colors.card }]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.infoLabel, { color: theme.colors.text }]}>Injuries/Limitations</Text>
+                  <Text style={[styles.infoValue, { color: theme.colors.text }]}>{client.injuries}</Text>
+                </View>
+              </View>
             )}
           </View>
+        </View>
 
-          <View style={styles.actionButtons}>
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => {
-                console.log('User tapped Edit Profile button');
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                router.push(`/edit-client/${id}`);
-              }}
-              activeOpacity={0.7}
-            >
-              <IconSymbol
-                ios_icon_name="pencil"
-                android_material_icon_name="edit"
-                size={20}
-                color="#FFFFFF"
-              />
-              <Text style={styles.actionButtonText}>Edit Profile</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => {
-                console.log('User tapped Track Progress button');
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                router.push(`/track-progress/${id}`);
-              }}
-              activeOpacity={0.7}
-            >
-              <IconSymbol
-                ios_icon_name="chart.bar.fill"
-                android_material_icon_name="show-chart"
-                size={20}
-                color="#FFFFFF"
-              />
-              <Text style={styles.actionButtonText}>Track Progress</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.actionButtons}>
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => {
-                console.log('User tapped Nutrition button');
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                router.push(`/nutrition/${id}`);
-              }}
-              activeOpacity={0.7}
-            >
-              <IconSymbol
-                ios_icon_name="leaf.fill"
-                android_material_icon_name="restaurant"
-                size={20}
-                color="#FFFFFF"
-              />
-              <Text style={styles.actionButtonText}>Nutrition</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => {
-                console.log('User tapped Readiness button');
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                router.push(`/readiness/${id}`);
-              }}
-              activeOpacity={0.7}
-            >
-              <IconSymbol
-                ios_icon_name="heart.fill"
-                android_material_icon_name="favorite"
-                size={20}
-                color="#FFFFFF"
-              />
-              <Text style={styles.actionButtonText}>Readiness</Text>
-            </TouchableOpacity>
-          </View>
-
+        <View style={styles.section}>
           <TouchableOpacity
-            style={[styles.generateButton, generating && styles.generateButtonDisabled]}
+            style={[styles.actionButton, { backgroundColor: colors.primary }]}
             onPress={handleGenerateProgram}
             disabled={generating}
-            activeOpacity={0.7}
           >
             {generating ? (
-              <View style={styles.generatingContainer}>
-                <ActivityIndicator color="#FFFFFF" />
-                <View style={styles.generatingTextContainer}>
-                  <Text style={styles.generateButtonText}>Generating Program...</Text>
-                  <Text style={styles.generatingProgressText}>{generatingProgress}</Text>
-                  <Text style={styles.generatingHintText}>This may take 60-120 seconds</Text>
-                </View>
-              </View>
+              <ActivityIndicator color="#fff" />
             ) : (
               <>
-                <IconSymbol
-                  ios_icon_name="sparkles"
-                  android_material_icon_name="auto-awesome"
-                  size={20}
-                  color="#FFFFFF"
-                />
-                <Text style={styles.generateButtonText}>Generate AI Program</Text>
+                <IconSymbol ios_icon_name="sparkles" android_material_icon_name="auto-awesome" size={20} color="#fff" />
+                <Text style={[styles.actionButtonText, { color: '#fff' }]}>Generate Program</Text>
               </>
             )}
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.deleteButton}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              setDeleteModalVisible(true);
-            }}
-            activeOpacity={0.7}
+            style={[styles.actionButton, { backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border }]}
+            onPress={() => router.push(`/edit-client/${id}`)}
           >
-            <IconSymbol
-              ios_icon_name="trash.fill"
-              android_material_icon_name="delete"
-              size={20}
-              color={colors.error}
-            />
-            <Text style={[styles.deleteButtonText, { color: colors.error }]}>
-              Delete Client
-            </Text>
+            <IconSymbol ios_icon_name="pencil" android_material_icon_name="edit" size={20} color={theme.colors.text} />
+            <Text style={[styles.actionButtonText, { color: theme.colors.text }]}>Edit Client</Text>
           </TouchableOpacity>
-        </ScrollView>
 
-        <Modal
-          visible={deleteModalVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setDeleteModalVisible(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { backgroundColor: theme.colors.card }]}>
-              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
-                Delete Client?
-              </Text>
-              <Text style={[styles.modalMessage, { color: colors.textSecondary }]}>
-                This will permanently delete this client and all their workout programs. This action cannot be undone.
-              </Text>
-              <View style={styles.modalButtons}>
-                <TouchableOpacity
-                  style={[styles.modalButton, styles.modalButtonCancel, { borderColor: theme.colors.border }]}
-                  onPress={() => setDeleteModalVisible(false)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.modalButtonText, { color: theme.colors.text }]}>
-                    Cancel
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.modalButton, styles.modalButtonDelete]}
-                  onPress={handleDeleteClient}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.modalButtonText, { color: '#FFFFFF' }]}>
-                    Delete
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
+          <TouchableOpacity
+            style={[styles.actionButton, { backgroundColor: colors.error + '20', borderWidth: 1, borderColor: colors.error }]}
+            onPress={() => setShowDeleteModal(true)}
+          >
+            <IconSymbol ios_icon_name="trash" android_material_icon_name="delete" size={20} color={colors.error} />
+            <Text style={[styles.actionButtonText, { color: colors.error }]}>Delete Client</Text>
+          </TouchableOpacity>
+        </View>
 
-        <Modal
-          visible={successModalVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setSuccessModalVisible(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { backgroundColor: theme.colors.card }]}>
-              <View style={styles.successIconContainer}>
-                <IconSymbol
-                  ios_icon_name="checkmark.circle.fill"
-                  android_material_icon_name="check-circle"
-                  size={64}
-                  color={colors.primary}
-                />
-              </View>
-              <Text style={[styles.modalTitle, { color: theme.colors.text, textAlign: 'center' }]}>
-                Program Generated!
-              </Text>
-              <Text style={[styles.modalMessage, { color: colors.textSecondary, textAlign: 'center' }]}>
-                Your AI-powered workout program has been successfully created.
-              </Text>
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Programs</Text>
+          {programs.length === 0 ? (
+            <Text style={[styles.emptyText, { color: theme.colors.text }]}>
+              No programs yet. Generate one to get started!
+            </Text>
+          ) : (
+            programs.map((program) => {
+              const weeksText = `${program.weeksDuration} weeks`;
+              const dateText = new Date(program.createdAt).toLocaleDateString();
+              
+              return (
+                <TouchableOpacity
+                  key={program.id}
+                  style={[styles.programCard, { backgroundColor: theme.colors.card }]}
+                  onPress={() => router.push(`/program/${program.id}`)}
+                >
+                  <View style={styles.programHeader}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.programTitle, { color: theme.colors.text }]}>
+                        {program.split}
+                      </Text>
+                      <Text style={[styles.programMeta, { color: theme.colors.text }]}>
+                        {weeksText} • Created {dateText}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.deleteButton}
+                      onPress={async () => {
+                        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                        await deleteProgram(program.id);
+                        await fetchClientPrograms();
+                      }}
+                    >
+                      <IconSymbol ios_icon_name="trash" android_material_icon_name="delete" size={20} color={colors.error} />
+                    </TouchableOpacity>
+                  </View>
+                </TouchableOpacity>
+              );
+            })
+          )}
+        </View>
+      </ScrollView>
+
+      <Modal visible={showDeleteModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.colors.card }]}>
+            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Delete Client?</Text>
+            <Text style={[styles.modalMessage, { color: theme.colors.text }]}>
+              This will permanently delete this client and all their programs. This action cannot be undone.
+            </Text>
+            <View style={styles.modalButtons}>
               <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonPrimary]}
-                onPress={() => setSuccessModalVisible(false)}
-                activeOpacity={0.7}
+                style={[styles.modalButton, { backgroundColor: theme.colors.background }]}
+                onPress={() => setShowDeleteModal(false)}
               >
-                <Text style={[styles.modalButtonText, { color: '#FFFFFF' }]}>
-                  Got it
-                </Text>
+                <Text style={[styles.modalButtonText, { color: theme.colors.text }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, { backgroundColor: colors.error }]}
+                onPress={handleDeleteClient}
+              >
+                <Text style={[styles.modalButtonText, { color: '#fff' }]}>Delete</Text>
               </TouchableOpacity>
             </View>
           </View>
-        </Modal>
-
-        <Modal
-          visible={errorModalVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setErrorModalVisible(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { backgroundColor: theme.colors.card }]}>
-              <View style={styles.errorIconContainer}>
-                <IconSymbol
-                  ios_icon_name="exclamationmark.triangle.fill"
-                  android_material_icon_name="error"
-                  size={64}
-                  color={colors.error}
-                />
-              </View>
-              <Text style={[styles.modalTitle, { color: theme.colors.text, textAlign: 'center' }]}>
-                Generation Failed
-              </Text>
-              <Text style={[styles.modalMessage, { color: colors.textSecondary, textAlign: 'center' }]}>
-                {errorMessage}
-              </Text>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonPrimary]}
-                onPress={() => setErrorModalVisible(false)}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.modalButtonText, { color: '#FFFFFF' }]}>
-                  OK
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
-      </View>
-    </>
+        </View>
+      </Modal>
+    </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  centerContent: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  scrollContent: {
-    paddingBottom: 40,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-  },
-  errorText: {
-    marginTop: 16,
-    fontSize: 18,
-  },
-  header: {
-    alignItems: 'center',
-    paddingVertical: 32,
-    paddingHorizontal: 16,
-  },
-  avatarLarge: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: colors.primary + '20',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  clientName: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  clientMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  clientMetaItem: {
-    fontSize: 16,
-  },
-  section: {
-    padding: 16,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 12,
-  },
-  card: {
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  statRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statLabel: {
-    fontSize: 14,
-    marginBottom: 4,
-  },
-  statValue: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-  },
-  infoLabel: {
-    fontSize: 16,
-  },
-  infoValue: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  emptyProgramText: {
-    fontSize: 16,
-    textAlign: 'center',
-    paddingVertical: 16,
-  },
-  programCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  programInfo: {
-    flex: 1,
-  },
-  programTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  programMeta: {
-    fontSize: 14,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: 12,
-    marginHorizontal: 16,
-    marginTop: 8,
-  },
-  actionButton: {
-    flex: 1,
-    backgroundColor: colors.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 8,
-    gap: 6,
-  },
-  actionButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  generateButton: {
-    backgroundColor: colors.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    borderRadius: 8,
-    marginHorizontal: 16,
-    marginTop: 8,
-    gap: 8,
-    minHeight: 56,
-  },
-  generateButtonDisabled: {
-    opacity: 0.9,
-  },
-  generateButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  generatingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  generatingTextContainer: {
-    alignItems: 'flex-start',
-  },
-  generatingProgressText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    marginTop: 4,
-    opacity: 0.9,
-  },
-  generatingHintText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    marginTop: 2,
-    opacity: 0.7,
-  },
-  deleteButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    borderRadius: 8,
-    marginHorizontal: 16,
-    marginTop: 12,
-    gap: 8,
-  },
-  deleteButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modalContent: {
-    borderRadius: 12,
-    padding: 24,
-    width: '100%',
-    maxWidth: 400,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 12,
-  },
-  modalMessage: {
-    fontSize: 16,
-    lineHeight: 24,
-    marginBottom: 24,
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  modalButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  modalButtonCancel: {
-    borderWidth: 1,
-  },
-  modalButtonDelete: {
-    backgroundColor: colors.error,
-  },
-  modalButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  successIconContainer: {
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  errorIconContainer: {
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  modalButtonPrimary: {
-    backgroundColor: colors.primary,
-    width: '100%',
-  },
-});

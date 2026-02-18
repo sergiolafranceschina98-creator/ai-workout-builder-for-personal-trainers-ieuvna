@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,99 +7,122 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  Modal,
 } from 'react-native';
 import { useTheme } from '@react-navigation/native';
-import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
+import { useRouter, useLocalSearchParams, Stack, useFocusEffect } from 'expo-router';
 import { IconSymbol } from '@/components/IconSymbol';
 import { colors } from '@/styles/commonStyles';
 import * as Haptics from 'expo-haptics';
-
-interface Client {
-  id: string;
-  name: string;
-  age: number;
-  gender: string;
-  height?: number;
-  weight?: number;
-  goals: string;
-}
-
-interface NutritionPlan {
-  id: string;
-  calories: number;
-  protein: number;
-  carbohydrates: number;
-  fats: number;
-  mealSuggestions?: any; // Can be array or object from JSONB
-  notes?: string;
-  createdAt: string;
-}
+import {
+  getClientById,
+  getNutritionByClientId,
+  createNutritionPlan,
+  Client,
+  NutritionPlan,
+} from '@/utils/localStorage';
 
 export default function NutritionScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const { id } = useLocalSearchParams();
+  const { id } = useLocalSearchParams<{ id: string }>();
 
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [client, setClient] = useState<Client | null>(null);
   const [nutritionPlan, setNutritionPlan] = useState<NutritionPlan | null>(null);
 
-  useEffect(() => {
-    fetchData();
-  }, [id]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     console.log('Fetching nutrition data for client:', id);
     try {
-      const { authenticatedGet } = await import('@/utils/api');
-      
-      const clientData = await authenticatedGet<Client>(`/api/clients/${id}`);
+      const clientData = await getClientById(id);
       setClient(clientData);
 
-      const nutritionData = await authenticatedGet<NutritionPlan | null>(`/api/clients/${id}/nutrition`);
+      const nutritionData = await getNutritionByClientId(id);
       console.log('[Nutrition] Fetched nutrition plan:', nutritionData);
       setNutritionPlan(nutritionData);
-      
-      setLoading(false);
     } catch (error) {
       console.error('Error fetching nutrition data:', error);
       setNutritionPlan(null);
+    } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchData();
+    }, [fetchData])
+  );
 
   const handleGenerateNutrition = async () => {
     console.log('User tapped Generate Nutrition Plan button');
 
-    if (!client) return;
+    if (!client) {
+      console.log('No client data available');
+      return;
+    }
 
     setGenerating(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
-      const { authenticatedPost } = await import('@/utils/api');
+      // Calculate basic macros based on client data
+      const weight = client.weight || 70;
+      const height = client.height || 170;
+      const age = client.age;
+      
+      // Basic BMR calculation (Mifflin-St Jeor)
+      const bmr = client.gender === 'male'
+        ? 10 * weight + 6.25 * height - 5 * age + 5
+        : 10 * weight + 6.25 * height - 5 * age - 161;
+      
+      // Activity multiplier (moderate activity)
+      const activityMultiplier = 1.55;
+      let calories = Math.round(bmr * activityMultiplier);
+      
+      // Adjust based on goal
+      const goal = client.goals.toLowerCase();
+      if (goal.includes('fat') || goal.includes('loss')) {
+        calories = Math.round(calories * 0.85); // 15% deficit
+      } else if (goal.includes('hypertrophy') || goal.includes('muscle')) {
+        calories = Math.round(calories * 1.1); // 10% surplus
+      }
+      
+      // Calculate macros
+      const proteinGrams = Math.round(weight * 2.2); // 2.2g per kg
+      const fatGrams = Math.round(weight * 1); // 1g per kg
+      const proteinCals = proteinGrams * 4;
+      const fatCals = fatGrams * 9;
+      const carbCals = calories - proteinCals - fatCals;
+      const carbGrams = Math.round(carbCals / 4);
+      
+      // Generate meal suggestions
+      const mealSuggestions = [
+        'Breakfast: Oatmeal with protein powder, berries, and almonds',
+        'Lunch: Grilled chicken breast with brown rice and vegetables',
+        'Snack: Greek yogurt with honey and mixed nuts',
+        'Dinner: Salmon with sweet potato and broccoli',
+        'Post-workout: Protein shake with banana',
+      ];
+      
+      const notes = `This nutrition plan is tailored for ${client.goals.toLowerCase()}. Adjust portions based on hunger and energy levels. Stay hydrated with at least 2-3 liters of water daily.`;
 
-      const requestData = {
-        goal: client.goals,
-        weight: client.weight || 70,
-        height: client.height || 170,
-        age: client.age,
-        gender: client.gender,
-        activityLevel: 'moderate',
-      };
+      const newPlan = await createNutritionPlan({
+        clientId: id,
+        calories,
+        protein: proteinGrams,
+        carbohydrates: carbGrams,
+        fats: fatGrams,
+        mealSuggestions,
+        notes,
+      });
 
-      console.log('[Nutrition] Generating nutrition plan:', requestData);
-
-      const result = await authenticatedPost(`/api/clients/${id}/nutrition`, requestData);
-      console.log('[Nutrition] Nutrition plan generated:', result);
-
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      console.log('Nutrition plan generated successfully:', newPlan.id);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       await fetchData();
     } catch (error) {
       console.error('Error generating nutrition plan:', error);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setGenerating(false);
     }
@@ -160,7 +183,7 @@ export default function NutritionScreen() {
                 No Nutrition Plan Yet
               </Text>
               <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                Generate an AI-powered nutrition plan tailored to your client&apos;s goals
+                Generate a nutrition plan tailored to your client&apos;s goals
               </Text>
               <TouchableOpacity
                 style={[styles.generateButton, generating && styles.generateButtonDisabled]}

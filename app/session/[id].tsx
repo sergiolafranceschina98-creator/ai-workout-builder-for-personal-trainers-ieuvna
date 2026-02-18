@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,38 +11,27 @@ import {
   Modal,
 } from 'react-native';
 import { useTheme } from '@react-navigation/native';
-import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
+import { useRouter, useLocalSearchParams, Stack, useFocusEffect } from 'expo-router';
 import { IconSymbol } from '@/components/IconSymbol';
 import { colors } from '@/styles/commonStyles';
 import * as Haptics from 'expo-haptics';
-
-interface ExerciseLog {
-  id: string;
-  exerciseName: string;
-  setsCompleted: number;
-  repsCompleted: string;
-  weightUsed: string;
-  rpe?: number;
-  notes?: string;
-}
-
-interface Session {
-  id: string;
-  sessionDate: string;
-  weekNumber: number;
-  dayName: string;
-  completed: boolean;
-  notes?: string;
-  exercises?: ExerciseLog[];
-}
+import {
+  getSessionById,
+  getExerciseLogsBySessionId,
+  createExerciseLog,
+  updateSession,
+  Session,
+  ExerciseLog,
+} from '@/utils/localStorage';
 
 export default function SessionDetailScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const { id } = useLocalSearchParams();
+  const { id } = useLocalSearchParams<{ id: string }>();
 
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<Session | null>(null);
+  const [exercises, setExercises] = useState<ExerciseLog[]>([]);
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [exerciseName, setExerciseName] = useState('');
   const [sets, setSets] = useState('3');
@@ -53,40 +42,45 @@ export default function SessionDetailScreen() {
   const [creating, setCreating] = useState(false);
   const [completing, setCompleting] = useState(false);
 
-  useEffect(() => {
-    fetchSessionDetails();
-  }, [id]);
-
-  const fetchSessionDetails = async () => {
+  const fetchSessionDetails = useCallback(async () => {
     console.log('Fetching session details:', id);
     try {
-      const { authenticatedGet } = await import('@/utils/api');
-      
-      const data = await authenticatedGet<Session>(`/api/sessions/${id}`);
+      const data = await getSessionById(id);
       console.log('[SessionDetail] Fetched session:', data);
       setSession(data);
-      setLoading(false);
+
+      const exerciseLogs = await getExerciseLogsBySessionId(id);
+      console.log('[SessionDetail] Fetched exercises:', exerciseLogs);
+      setExercises(exerciseLogs);
     } catch (error) {
       console.error('Error fetching session details:', error);
       setSession(null);
+      setExercises([]);
+    } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchSessionDetails();
+    }, [fetchSessionDetails])
+  );
 
   const handleAddExercise = async () => {
     console.log('User tapped Add Exercise button');
 
     if (!exerciseName.trim() || !reps.trim() || !weight.trim()) {
+      console.log('Validation failed: Missing required fields');
       return;
     }
 
     setCreating(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
-      const { authenticatedPost } = await import('@/utils/api');
-
       const exerciseData = {
+        sessionId: id,
         exerciseName: exerciseName.trim(),
         setsCompleted: parseInt(sets),
         repsCompleted: reps.trim(),
@@ -97,10 +91,10 @@ export default function SessionDetailScreen() {
 
       console.log('[SessionDetail] Adding exercise:', exerciseData);
 
-      const result = await authenticatedPost(`/api/sessions/${id}/exercises`, exerciseData);
+      const result = await createExerciseLog(exerciseData);
       console.log('[SessionDetail] Exercise added:', result);
 
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setAddModalVisible(false);
       setExerciseName('');
       setSets('3');
@@ -111,7 +105,7 @@ export default function SessionDetailScreen() {
       await fetchSessionDetails();
     } catch (error) {
       console.error('Error adding exercise:', error);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setCreating(false);
     }
@@ -120,19 +114,17 @@ export default function SessionDetailScreen() {
   const handleCompleteSession = async () => {
     console.log('User tapped Complete Session button');
     setCompleting(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
-      const { authenticatedPut } = await import('@/utils/api');
+      await updateSession(id, { completed: true });
+      console.log('[SessionDetail] Session completed');
 
-      const result = await authenticatedPut(`/api/sessions/${id}`, { completed: true });
-      console.log('[SessionDetail] Session completed:', result);
-
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       await fetchSessionDetails();
     } catch (error) {
       console.error('Error completing session:', error);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setCompleting(false);
     }
@@ -254,14 +246,14 @@ export default function SessionDetailScreen() {
               </TouchableOpacity>
             </View>
 
-            {!session.exercises || session.exercises.length === 0 ? (
+            {exercises.length === 0 ? (
               <View style={[styles.emptyState, { backgroundColor: theme.colors.card }]}>
                 <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
                   No exercises logged yet
                 </Text>
               </View>
             ) : (
-              session.exercises.map((exercise, index) => {
+              exercises.map((exercise, index) => {
                 const exerciseNumber = index + 1;
                 const rpeText = exercise.rpe ? `RPE ${exercise.rpe}` : '';
                 
@@ -322,7 +314,7 @@ export default function SessionDetailScreen() {
             )}
           </View>
 
-          {!session.completed && session.exercises && session.exercises.length > 0 && (
+          {!session.completed && exercises.length > 0 && (
             <TouchableOpacity
               style={[styles.completeButton, completing && styles.completeButtonDisabled]}
               onPress={handleCompleteSession}

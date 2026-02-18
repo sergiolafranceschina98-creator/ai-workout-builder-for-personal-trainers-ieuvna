@@ -12,19 +12,12 @@ export default function TabLayout() {
       ios_icon_name: 'person.2.fill',
       android_material_icon_name: 'group' as const,
     },
-    {
-      route: '/(tabs)/profile' as Href,
-      label: 'Profile',
-      ios_icon_name: 'person.circle.fill',
-      android_material_icon_name: 'account-circle' as const,
-    },
   ];
 
   return (
     <>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(home)" />
-        <Stack.Screen name="profile" />
       </Stack>
       <FloatingTabBar tabs={tabs} />
     </>

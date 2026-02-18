@@ -2,52 +2,43 @@
 {
   "expo": {
     "name": "AI Workout Builder",
-    "slug": "ai-workout-builder",
+    "slug": "aiworkoutbuilder-app",
+    "scheme": "aiworkoutbuilder",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/app-icon-mlj.png",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/app-icon-mlj.png",
+      "image": "./assets/images/final_quest_240x240.png",
       "resizeMode": "contain",
-      "backgroundColor": "#000000"
+      "backgroundColor": "#ffffff"
     },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.aiworkoutbuilder.app",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false,
-        "NSPhotoLibraryUsageDescription": "This app needs access to your photo library to upload client progress photos.",
-        "NSCameraUsageDescription": "This app needs access to your camera to take client progress photos.",
-        "NSUserTrackingUsageDescription": "This app uses data for personalized workout recommendations."
-      },
-      "buildNumber": "1"
+        "NSCameraUsageDescription": "This app uses the camera to allow you to take progress photos.",
+        "NSPhotoLibraryUsageDescription": "This app uses the photo library to allow you to select progress photos."
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/app-icon-mlj.png",
-        "backgroundColor": "#000000"
+        "foregroundImage": "./assets/images/final_quest_240x240.png",
+        "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true,
-      "package": "com.aiworkoutbuilder.app",
-      "versionCode": 1,
-      "permissions": [
-        "CAMERA",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE"
-      ]
+      "package": "com.aiworkoutbuilder.app"
     },
     "web": {
-      "favicon": "./assets/images/final_quest_240x240.png",
-      "bundler": "metro"
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/final_quest_240x240.png"
     },
     "plugins": [
-      "expo-font",
-      "expo-router",
-      "expo-web-browser"
+      "expo-router"
     ],
-    "scheme": "aiworkoutbuilder",
     "experiments": {
       "typedRoutes": true
     },
@@ -55,9 +46,8 @@
       "router": {
         "origin": false
       },
-      "backendUrl": "https://z4wq56w9vzhvre6q3b5txh2fwwfeddrh.app.specular.dev",
       "eas": {
-        "projectId": "your-project-id-here"
+        "projectId": "YOUR_EAS_PROJECT_ID"
       }
     }
   }

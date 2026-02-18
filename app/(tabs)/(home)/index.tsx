@@ -1,5 +1,4 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,365 +9,55 @@ import {
   RefreshControl,
   Platform,
 } from 'react-native';
-import { useRouter, useFocusEffect } from 'expo-router';
-import { useTheme } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { IconSymbol } from '@/components/IconSymbol';
 import ProgressRing from '@/components/ProgressRing';
-import StatCard from '@/components/StatCard';
 import { colors, shadows } from '@/styles/commonStyles';
-import { useAuth } from '@/contexts/AuthContext';
-
-interface Client {
-  id: string;
-  name: string;
-  age: number;
-  gender: string;
-  experience: string;
-  goals: string;
-  trainingFrequency: number;
-  createdAt: string;
-}
-
-export default function HomeScreen() {
-  const router = useRouter();
-  const theme = useTheme();
-  const { user } = useAuth();
-  const [clients, setClients] = useState<Client[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const fetchClients = async () => {
-    console.log('Fetching clients for trainer');
-    try {
-      const { authenticatedGet } = await import('@/utils/api');
-      const data = await authenticatedGet<Client[]>('/api/clients');
-      console.log('[Home] Fetched clients:', data);
-      setClients(data);
-    } catch (error) {
-      console.error('Error fetching clients:', error);
-      setClients([]);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  useEffect(() => {
-    if (user) {
-      fetchClients();
-    }
-  }, [user]);
-
-  useFocusEffect(
-    useCallback(() => {
-      console.log('[Home] Screen focused - refreshing client list');
-      if (user) {
-        fetchClients();
-      }
-    }, [user])
-  );
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    fetchClients();
-  };
-
-  const handleAddClient = () => {
-    console.log('User tapped Add Client button');
-    router.push('/add-client');
-  };
-
-  const handleClientPress = (clientId: string) => {
-    console.log('User tapped client card:', clientId);
-    router.push(`/client/${clientId}`);
-  };
-
-  const getExperienceBadgeColor = (experience: string) => {
-    const exp = experience.toLowerCase();
-    if (exp === 'beginner') return colors.success;
-    if (exp === 'intermediate') return colors.accent;
-    if (exp === 'advanced') return colors.error;
-    return colors.textSecondary;
-  };
-
-  const formatGoal = (goal: string) => {
-    const goalMap: Record<string, string> = {
-      'fat_loss': 'Fat Loss',
-      'hypertrophy': 'Muscle Growth',
-      'strength': 'Strength',
-      'rehab': 'Rehabilitation',
-      'sport_specific': 'Sport Performance',
-    };
-    return goalMap[goal] || goal;
-  };
-
-  if (loading) {
-    return (
-      <View style={[styles.container, styles.centerContent, { backgroundColor: theme.colors.background }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={[styles.loadingText, { color: theme.colors.text }]}>
-          Loading clients...
-        </Text>
-      </View>
-    );
-  }
-
-  const totalClients = clients.length;
-  const activePrograms = 0;
-  const completionRate = 0;
-
-  const userName = user?.name || 'Trainer';
-  const greetingText = `Welcome back, ${userName}!`;
-  const subtitleText = 'Manage your clients and programs';
-
-  return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.primary}
-          />
-        }
-      >
-        <LinearGradient
-          colors={[colors.primary, colors.accent]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.headerGradient}
-        >
-          <View style={styles.headerContent}>
-            <View style={styles.headerTextContainer}>
-              <Text style={styles.greeting}>
-                {greetingText}
-              </Text>
-              <Text style={styles.subtitle}>
-                {subtitleText}
-              </Text>
-            </View>
-            <View style={styles.headerIcon}>
-              <IconSymbol
-                ios_icon_name="figure.strengthtraining.traditional"
-                android_material_icon_name="fitness-center"
-                size={48}
-                color="#FFFFFF"
-              />
-            </View>
-          </View>
-        </LinearGradient>
-
-        <View style={styles.statsContainer}>
-          <StatCard
-            title="Total Clients"
-            value={totalClients.toString()}
-            icon="person"
-            color={colors.primary}
-          />
-          <StatCard
-            title="Active Programs"
-            value={activePrograms.toString()}
-            icon="description"
-            color={colors.accent}
-          />
-          <StatCard
-            title="Completion Rate"
-            value={`${completionRate}%`}
-            icon="check-circle"
-            color={colors.success}
-          />
-        </View>
-
-        <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-            Your Clients
-          </Text>
-          <TouchableOpacity
-            style={[styles.addButton, { backgroundColor: colors.primary }]}
-            onPress={handleAddClient}
-            activeOpacity={0.7}
-          >
-            <IconSymbol
-              ios_icon_name="plus"
-              android_material_icon_name="add"
-              size={20}
-              color="#FFFFFF"
-            />
-            <Text style={styles.addButtonText}>
-              Add Client
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {clients.length === 0 ? (
-          <View style={[styles.emptyState, { backgroundColor: theme.colors.card }]}>
-            <IconSymbol
-              ios_icon_name="person.crop.circle.badge.plus"
-              android_material_icon_name="person-add"
-              size={64}
-              color={colors.textSecondary}
-            />
-            <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>
-              No Clients Yet
-            </Text>
-            <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-              Add your first client to start creating personalized workout programs
-            </Text>
-            <TouchableOpacity
-              style={[styles.emptyButton, { backgroundColor: colors.primary }]}
-              onPress={handleAddClient}
-              activeOpacity={0.7}
-            >
-              <IconSymbol
-                ios_icon_name="plus.circle.fill"
-                android_material_icon_name="add-circle"
-                size={24}
-                color="#FFFFFF"
-              />
-              <Text style={styles.emptyButtonText}>
-                Add Your First Client
-              </Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <View style={styles.clientsList}>
-            {clients.map((client) => {
-              const experienceColor = getExperienceBadgeColor(client.experience);
-              const goalText = formatGoal(client.goals);
-              const frequencyText = `${client.trainingFrequency}x/week`;
-              const experienceText = client.experience;
-              
-              return (
-                <TouchableOpacity
-                  key={client.id}
-                  style={[styles.clientCard, { backgroundColor: theme.colors.card }, shadows.medium]}
-                  onPress={() => handleClientPress(client.id)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.clientHeader}>
-                    <View style={[styles.clientAvatar, { backgroundColor: colors.primary + '20' }]}>
-                      <Text style={[styles.clientInitial, { color: colors.primary }]}>
-                        {client.name.charAt(0).toUpperCase()}
-                      </Text>
-                    </View>
-                    <View style={styles.clientInfo}>
-                      <Text style={[styles.clientName, { color: theme.colors.text }]}>
-                        {client.name}
-                      </Text>
-                      <View style={styles.clientMeta}>
-                        <Text style={[styles.clientMetaText, { color: colors.textSecondary }]}>
-                          {client.age} yrs
-                        </Text>
-                        <Text style={[styles.clientMetaText, { color: colors.textSecondary }]}>
-                          •
-                        </Text>
-                        <Text style={[styles.clientMetaText, { color: colors.textSecondary }]}>
-                          {client.gender}
-                        </Text>
-                      </View>
-                    </View>
-                    <IconSymbol
-                      ios_icon_name="chevron.right"
-                      android_material_icon_name="chevron-right"
-                      size={24}
-                      color={colors.textSecondary}
-                    />
-                  </View>
-                  <View style={styles.clientDetails}>
-                    <View style={[styles.badge, { backgroundColor: experienceColor + '20' }]}>
-                      <Text style={[styles.badgeText, { color: experienceColor }]}>
-                        {experienceText}
-                      </Text>
-                    </View>
-                    <View style={[styles.badge, { backgroundColor: colors.accent + '20' }]}>
-                      <Text style={[styles.badgeText, { color: colors.accent }]}>
-                        {goalText}
-                      </Text>
-                    </View>
-                    <View style={[styles.badge, { backgroundColor: colors.primary + '20' }]}>
-                      <Text style={[styles.badgeText, { color: colors.primary }]}>
-                        {frequencyText}
-                      </Text>
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        )}
-      </ScrollView>
-    </View>
-  );
-}
+import { useRouter, useFocusEffect } from 'expo-router';
+import React, { useState, useCallback } from 'react';
+import { useTheme } from '@react-navigation/native';
+import StatCard from '@/components/StatCard';
+import { getAllClients, Client } from '@/utils/localStorage';
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  centerContent: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   scrollContent: {
     paddingBottom: 100,
   },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-  },
-  headerGradient: {
-    paddingTop: Platform.OS === 'android' ? 48 : 0,
+  header: {
+    paddingTop: Platform.OS === 'android' ? 48 : 60,
     paddingHorizontal: 20,
-    paddingBottom: 32,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    paddingBottom: 20,
   },
-  headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTextContainer: {
-    flex: 1,
-  },
-  greeting: {
-    fontSize: 28,
+  headerTitle: {
+    fontSize: 34,
     fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 4,
+    marginBottom: 8,
   },
-  subtitle: {
-    fontSize: 16,
-    color: '#FFFFFF',
-    opacity: 0.9,
-  },
-  headerIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
+  headerSubtitle: {
+    fontSize: 17,
+    opacity: 0.6,
   },
   statsContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingTop: 20,
+    paddingHorizontal: 20,
+    marginBottom: 24,
     gap: 12,
+  },
+  clientsSection: {
+    paddingHorizontal: 20,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 16,
+    marginBottom: 16,
   },
   sectionTitle: {
     fontSize: 22,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
   addButton: {
     flexDirection: 'row',
@@ -379,28 +68,78 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   addButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
   },
-  emptyState: {
-    marginHorizontal: 20,
-    marginTop: 20,
-    padding: 40,
+  clientCard: {
     borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    ...shadows.medium,
+  },
+  clientHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  clientInfo: {
+    flex: 1,
+  },
+  clientName: {
+    fontSize: 20,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  clientMeta: {
+    fontSize: 14,
+    opacity: 0.6,
+  },
+  experienceBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  experienceBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  clientDetails: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  detailItem: {
+    flex: 1,
+  },
+  detailLabel: {
+    fontSize: 12,
+    opacity: 0.6,
+    marginBottom: 4,
+  },
+  detailValue: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  emptyState: {
     alignItems: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 40,
+  },
+  emptyIcon: {
+    marginBottom: 16,
   },
   emptyTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginTop: 16,
+    fontSize: 22,
+    fontWeight: '600',
     marginBottom: 8,
+    textAlign: 'center',
   },
   emptySubtitle: {
-    fontSize: 15,
+    fontSize: 16,
+    opacity: 0.6,
     textAlign: 'center',
     marginBottom: 24,
-    lineHeight: 22,
   },
   emptyButton: {
     flexDirection: 'row',
@@ -411,65 +150,234 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   emptyButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '600',
+    color: '#fff',
   },
-  clientsList: {
-    paddingHorizontal: 20,
-    gap: 12,
-  },
-  clientCard: {
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 4,
-  },
-  clientHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  clientAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  loadingContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
-  },
-  clientInitial: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  clientInfo: {
-    flex: 1,
-  },
-  clientName: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  clientMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  clientMetaText: {
-    fontSize: 14,
-  },
-  clientDetails: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  badge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  badgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'capitalize',
   },
 });
+
+export default function HomeScreen() {
+  const router = useRouter();
+  const theme = useTheme();
+  const [clients, setClients] = useState<Client[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchClients = useCallback(async () => {
+    try {
+      console.log('Fetching clients from local storage...');
+      const data = await getAllClients();
+      console.log('Clients loaded:', data.length);
+      setClients(data);
+    } catch (error) {
+      console.error('Error fetching clients:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      console.log('Home screen focused, refreshing clients...');
+      fetchClients();
+    }, [fetchClients])
+  );
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchClients();
+  }, [fetchClients]);
+
+  const handleAddClient = () => {
+    console.log('User tapped Add Client button');
+    router.push('/add-client');
+  };
+
+  const handleClientPress = (clientId: string) => {
+    console.log('User tapped client:', clientId);
+    router.push(`/client/${clientId}`);
+  };
+
+  const getExperienceBadgeColor = (experience: string): string => {
+    const exp = experience.toLowerCase();
+    if (exp === 'beginner') {
+      const beginnerColor = '#34C759';
+      return beginnerColor;
+    }
+    if (exp === 'intermediate') {
+      const intermediateColor = '#FF9500';
+      return intermediateColor;
+    }
+    const advancedColor = '#FF3B30';
+    return advancedColor;
+  };
+
+  const formatGoal = (goal: string): string => {
+    const goalMap: Record<string, string> = {
+      fat_loss: 'Fat Loss',
+      hypertrophy: 'Muscle Growth',
+      strength: 'Strength',
+      rehab: 'Rehabilitation',
+      sport_specific: 'Sport Performance',
+    };
+    return goalMap[goal] || goal;
+  };
+
+  if (loading) {
+    return (
+      <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  const totalClients = clients.length;
+  const activeClients = clients.length;
+
+  return (
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+        }
+      >
+        <LinearGradient
+          colors={[colors.primary, colors.secondary]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.header}
+        >
+          <Text style={[styles.headerTitle, { color: '#fff' }]}>AI Workout Builder</Text>
+          <Text style={[styles.headerSubtitle, { color: '#fff' }]}>
+            Personalized training programs
+          </Text>
+        </LinearGradient>
+
+        <View style={styles.statsContainer}>
+          <StatCard
+            title="Total Clients"
+            value={totalClients.toString()}
+            icon="group"
+            color={colors.primary}
+          />
+          <StatCard
+            title="Active"
+            value={activeClients.toString()}
+            icon="fitness-center"
+            color={colors.success}
+          />
+        </View>
+
+        <View style={styles.clientsSection}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Clients</Text>
+            <TouchableOpacity
+              style={[styles.addButton, { backgroundColor: colors.primary }]}
+              onPress={handleAddClient}
+            >
+              <IconSymbol
+                ios_icon_name="plus"
+                android_material_icon_name="add"
+                size={18}
+                color="#fff"
+              />
+              <Text style={[styles.addButtonText, { color: '#fff' }]}>Add Client</Text>
+            </TouchableOpacity>
+          </View>
+
+          {clients.length === 0 ? (
+            <View style={styles.emptyState}>
+              <View style={styles.emptyIcon}>
+                <IconSymbol
+                  ios_icon_name="person.2"
+                  android_material_icon_name="group"
+                  size={64}
+                  color={theme.colors.text}
+                  style={{ opacity: 0.3 }}
+                />
+              </View>
+              <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>
+                No Clients Yet
+              </Text>
+              <Text style={[styles.emptySubtitle, { color: theme.colors.text }]}>
+                Add your first client to start creating personalized workout programs
+              </Text>
+              <TouchableOpacity
+                style={[styles.emptyButton, { backgroundColor: colors.primary }]}
+                onPress={handleAddClient}
+              >
+                <IconSymbol
+                  ios_icon_name="plus.circle.fill"
+                  android_material_icon_name="add-circle"
+                  size={24}
+                  color="#fff"
+                />
+                <Text style={styles.emptyButtonText}>Add Your First Client</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            clients.map((client) => {
+              const experienceColor = getExperienceBadgeColor(client.experience);
+              const goalText = formatGoal(client.goals);
+              const ageText = `${client.age} years`;
+              const genderText = client.gender;
+              const metaText = `${ageText} • ${genderText}`;
+              const frequencyText = `${client.trainingFrequency}x/week`;
+              
+              return (
+                <TouchableOpacity
+                  key={client.id}
+                  style={[styles.clientCard, { backgroundColor: theme.colors.card }]}
+                  onPress={() => handleClientPress(client.id)}
+                >
+                  <View style={styles.clientHeader}>
+                    <View style={styles.clientInfo}>
+                      <Text style={[styles.clientName, { color: theme.colors.text }]}>
+                        {client.name}
+                      </Text>
+                      <Text style={[styles.clientMeta, { color: theme.colors.text }]}>
+                        {metaText}
+                      </Text>
+                    </View>
+                    <View style={[styles.experienceBadge, { backgroundColor: experienceColor }]}>
+                      <Text style={styles.experienceBadgeText}>
+                        {client.experience}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.clientDetails}>
+                    <View style={styles.detailItem}>
+                      <Text style={[styles.detailLabel, { color: theme.colors.text }]}>
+                        Goal
+                      </Text>
+                      <Text style={[styles.detailValue, { color: theme.colors.text }]}>
+                        {goalText}
+                      </Text>
+                    </View>
+                    <View style={styles.detailItem}>
+                      <Text style={[styles.detailLabel, { color: theme.colors.text }]}>
+                        Frequency
+                      </Text>
+                      <Text style={[styles.detailValue, { color: theme.colors.text }]}>
+                        {frequencyText}
+                      </Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              );
+            })
+          )}
+        </View>
+      </ScrollView>
+    </View>
+  );
+}

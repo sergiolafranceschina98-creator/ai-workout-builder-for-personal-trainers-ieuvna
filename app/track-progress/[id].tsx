@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,101 +11,103 @@ import {
   Modal,
 } from 'react-native';
 import { useTheme } from '@react-navigation/native';
-import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
+import { useRouter, useLocalSearchParams, Stack, useFocusEffect } from 'expo-router';
 import { IconSymbol } from '@/components/IconSymbol';
 import { colors } from '@/styles/commonStyles';
 import * as Haptics from 'expo-haptics';
-
-interface WorkoutSession {
-  id: string;
-  sessionDate: string;
-  weekNumber: number;
-  dayName: string;
-  completed: boolean;
-  notes?: string;
-  exerciseCount?: number;
-}
-
-interface Client {
-  id: string;
-  name: string;
-}
+import {
+  getClientById,
+  getSessionsByClientId,
+  getExerciseLogsBySessionId,
+  createSession,
+  Client,
+  Session,
+} from '@/utils/localStorage';
 
 export default function TrackProgressScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const { id } = useLocalSearchParams();
+  const { id } = useLocalSearchParams<{ id: string }>();
 
   const [loading, setLoading] = useState(true);
-  const [sessions, setSessions] = useState<WorkoutSession[]>([]);
+  const [sessions, setSessions] = useState<Session[]>([]);
   const [client, setClient] = useState<Client | null>(null);
   const [addModalVisible, setAddModalVisible] = useState(false);
-  const [programId, setProgramId] = useState('');
   const [weekNumber, setWeekNumber] = useState('1');
   const [dayName, setDayName] = useState('');
   const [notes, setNotes] = useState('');
   const [creating, setCreating] = useState(false);
 
-  useEffect(() => {
-    fetchData();
-  }, [id]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     console.log('Fetching workout sessions for client:', id);
     try {
-      const { authenticatedGet } = await import('@/utils/api');
-      
-      const clientData = await authenticatedGet<Client>(`/api/clients/${id}`);
+      const clientData = await getClientById(id);
       setClient(clientData);
 
-      const sessionsData = await authenticatedGet<WorkoutSession[]>(`/api/clients/${id}/sessions`);
+      const sessionsData = await getSessionsByClientId(id);
       console.log('[TrackProgress] Fetched sessions:', sessionsData);
-      setSessions(sessionsData);
       
-      setLoading(false);
+      // Get exercise counts for each session
+      const sessionsWithCounts = await Promise.all(
+        sessionsData.map(async (session) => {
+          const exercises = await getExerciseLogsBySessionId(session.id);
+          return {
+            ...session,
+            exerciseCount: exercises.length,
+          };
+        })
+      );
+      
+      setSessions(sessionsWithCounts);
     } catch (error) {
       console.error('Error fetching workout sessions:', error);
       setSessions([]);
+    } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchData();
+    }, [fetchData])
+  );
 
   const handleCreateSession = async () => {
     console.log('User tapped Create Session button');
 
     if (!dayName.trim()) {
+      console.log('Validation failed: Day name is required');
       return;
     }
 
     setCreating(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
-      const { authenticatedPost } = await import('@/utils/api');
-
       const sessionData = {
-        programId: programId || 'default',
+        clientId: id,
         sessionDate: new Date().toISOString(),
         weekNumber: parseInt(weekNumber),
         dayName: dayName.trim(),
+        completed: false,
         notes: notes.trim() || undefined,
       };
 
       console.log('[TrackProgress] Creating session:', sessionData);
 
-      const result = await authenticatedPost(`/api/clients/${id}/sessions`, sessionData);
+      const result = await createSession(sessionData);
       console.log('[TrackProgress] Session created:', result);
 
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setAddModalVisible(false);
-      setProgramId('');
       setWeekNumber('1');
       setDayName('');
       setNotes('');
       await fetchData();
     } catch (error) {
       console.error('Error creating session:', error);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setCreating(false);
     }

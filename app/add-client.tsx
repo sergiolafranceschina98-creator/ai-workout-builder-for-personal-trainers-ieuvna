@@ -1,5 +1,7 @@
 
+import { useRouter, Stack } from 'expo-router';
 import React, { useState } from 'react';
+import { IconSymbol } from '@/components/IconSymbol';
 import {
   View,
   Text,
@@ -13,72 +15,158 @@ import {
   Modal,
 } from 'react-native';
 import { useTheme } from '@react-navigation/native';
-import { useRouter, Stack } from 'expo-router';
-import { colors } from '@/styles/commonStyles';
-import { IconSymbol } from '@/components/IconSymbol';
 import * as Haptics from 'expo-haptics';
+import { colors } from '@/styles/commonStyles';
+import { createClient } from '@/utils/localStorage';
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 20,
+  },
+  section: {
+    marginBottom: 24,
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  input: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+  },
+  optionsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  optionButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 2,
+  },
+  optionText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  submitButton: {
+    backgroundColor: colors.primary,
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  submitButtonText: {
+    color: '#fff',
+    fontSize: 17,
+    fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: '80%',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  modalMessage: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 24,
+    opacity: 0.7,
+  },
+  modalButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 32,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  modalButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+});
 
 export default function AddClientScreen() {
-  const theme = useTheme();
   const router = useRouter();
+  const theme = useTheme();
   const [loading, setLoading] = useState(false);
-  const [errorModalVisible, setErrorModalVisible] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const [name, setName] = useState('');
   const [age, setAge] = useState('');
-  const [gender, setGender] = useState('');
+  const [gender, setGender] = useState('male');
   const [height, setHeight] = useState('');
   const [weight, setWeight] = useState('');
-  const [experience, setExperience] = useState('');
-  const [goals, setGoals] = useState('');
-  const [trainingFrequency, setTrainingFrequency] = useState('');
-  const [equipment, setEquipment] = useState('');
+  const [experience, setExperience] = useState('beginner');
+  const [goals, setGoals] = useState('hypertrophy');
+  const [trainingFrequency, setTrainingFrequency] = useState('3');
+  const [equipment, setEquipment] = useState('commercial_gym');
   const [injuries, setInjuries] = useState('');
-  const [timePerSession, setTimePerSession] = useState('');
+  const [timePerSession, setTimePerSession] = useState('60');
 
   const handleSubmit = async () => {
-    console.log('User tapped Create Client button');
+    console.log('User tapped Submit button');
     
-    if (!name || !age || !gender || !experience || !goals || !trainingFrequency || !equipment || !timePerSession) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      console.log('Validation failed: Missing required fields');
-      setErrorMessage('Please fill in all required fields');
-      setErrorModalVisible(true);
+    if (!name.trim()) {
+      console.log('Validation failed: Name is required');
       return;
     }
 
-    setLoading(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    if (!age || parseInt(age) <= 0) {
+      console.log('Validation failed: Valid age is required');
+      return;
+    }
 
     try {
+      setLoading(true);
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
       const clientData = {
-        name,
+        name: name.trim(),
         age: parseInt(age),
         gender,
-        height: height ? parseInt(height) : undefined,
+        height: height ? parseFloat(height) : undefined,
         weight: weight ? parseFloat(weight) : undefined,
         experience,
         goals,
         trainingFrequency: parseInt(trainingFrequency),
         equipment,
-        injuries: injuries || undefined,
+        injuries: injuries.trim() || undefined,
         timePerSession: parseInt(timePerSession),
       };
 
       console.log('Creating client with data:', clientData);
-      
-      const { authenticatedPost } = await import('@/utils/api');
-      const createdClient = await authenticatedPost('/api/clients', clientData);
-      console.log('[AddClient] Client created successfully:', createdClient);
-      
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.back();
-    } catch (error: any) {
+      const newClient = await createClient(clientData);
+      console.log('Client created successfully:', newClient.id);
+
+      setShowSuccessModal(true);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      setTimeout(() => {
+        setShowSuccessModal(false);
+        router.back();
+      }, 1500);
+    } catch (error) {
       console.error('Error creating client:', error);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      setErrorMessage(error?.message || 'Failed to create client. Please try again.');
-      setErrorModalVisible(true);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } finally {
       setLoading(false);
     }
   };
@@ -90,16 +178,22 @@ export default function AddClientScreen() {
         key={value}
         style={[
           styles.optionButton,
-          { borderColor: theme.colors.border },
-          isSelected && { backgroundColor: colors.primary, borderColor: colors.primary },
+          {
+            borderColor: isSelected ? colors.primary : theme.colors.border,
+            backgroundColor: isSelected ? colors.primary + '20' : 'transparent',
+          },
         ]}
         onPress={() => {
           setGender(value);
-          Haptics.selectionAsync();
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         }}
-        activeOpacity={0.7}
       >
-        <Text style={[styles.optionText, { color: isSelected ? '#FFFFFF' : theme.colors.text }]}>
+        <Text
+          style={[
+            styles.optionText,
+            { color: isSelected ? colors.primary : theme.colors.text },
+          ]}
+        >
           {label}
         </Text>
       </TouchableOpacity>
@@ -113,16 +207,22 @@ export default function AddClientScreen() {
         key={value}
         style={[
           styles.optionButton,
-          { borderColor: theme.colors.border },
-          isSelected && { backgroundColor: colors.primary, borderColor: colors.primary },
+          {
+            borderColor: isSelected ? colors.primary : theme.colors.border,
+            backgroundColor: isSelected ? colors.primary + '20' : 'transparent',
+          },
         ]}
         onPress={() => {
           setExperience(value);
-          Haptics.selectionAsync();
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         }}
-        activeOpacity={0.7}
       >
-        <Text style={[styles.optionText, { color: isSelected ? '#FFFFFF' : theme.colors.text }]}>
+        <Text
+          style={[
+            styles.optionText,
+            { color: isSelected ? colors.primary : theme.colors.text },
+          ]}
+        >
           {label}
         </Text>
       </TouchableOpacity>
@@ -136,16 +236,22 @@ export default function AddClientScreen() {
         key={value}
         style={[
           styles.optionButton,
-          { borderColor: theme.colors.border },
-          isSelected && { backgroundColor: colors.primary, borderColor: colors.primary },
+          {
+            borderColor: isSelected ? colors.primary : theme.colors.border,
+            backgroundColor: isSelected ? colors.primary + '20' : 'transparent',
+          },
         ]}
         onPress={() => {
           setGoals(value);
-          Haptics.selectionAsync();
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         }}
-        activeOpacity={0.7}
       >
-        <Text style={[styles.optionText, { color: isSelected ? '#FFFFFF' : theme.colors.text }]}>
+        <Text
+          style={[
+            styles.optionText,
+            { color: isSelected ? colors.primary : theme.colors.text },
+          ]}
+        >
           {label}
         </Text>
       </TouchableOpacity>
@@ -159,16 +265,22 @@ export default function AddClientScreen() {
         key={value}
         style={[
           styles.optionButton,
-          { borderColor: theme.colors.border },
-          isSelected && { backgroundColor: colors.primary, borderColor: colors.primary },
+          {
+            borderColor: isSelected ? colors.primary : theme.colors.border,
+            backgroundColor: isSelected ? colors.primary + '20' : 'transparent',
+          },
         ]}
         onPress={() => {
           setEquipment(value);
-          Haptics.selectionAsync();
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         }}
-        activeOpacity={0.7}
       >
-        <Text style={[styles.optionText, { color: isSelected ? '#FFFFFF' : theme.colors.text }]}>
+        <Text
+          style={[
+            styles.optionText,
+            { color: isSelected ? colors.primary : theme.colors.text },
+          ]}
+        >
           {label}
         </Text>
       </TouchableOpacity>
@@ -182,16 +294,22 @@ export default function AddClientScreen() {
         key={value}
         style={[
           styles.optionButton,
-          { borderColor: theme.colors.border },
-          isSelected && { backgroundColor: colors.primary, borderColor: colors.primary },
+          {
+            borderColor: isSelected ? colors.primary : theme.colors.border,
+            backgroundColor: isSelected ? colors.primary + '20' : 'transparent',
+          },
         ]}
         onPress={() => {
           setTimePerSession(value);
-          Haptics.selectionAsync();
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         }}
-        activeOpacity={0.7}
       >
-        <Text style={[styles.optionText, { color: isSelected ? '#FFFFFF' : theme.colors.text }]}>
+        <Text
+          style={[
+            styles.optionText,
+            { color: isSelected ? colors.primary : theme.colors.text },
+          ]}
+        >
           {label}
         </Text>
       </TouchableOpacity>
@@ -199,324 +317,224 @@ export default function AddClientScreen() {
   };
 
   return (
-    <>
+    <KeyboardAvoidingView
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <Stack.Screen
         options={{
           title: 'New Client',
-          presentation: 'modal',
-          headerLeft: () => (
-            <TouchableOpacity onPress={() => router.back()}>
-              <Text style={{ color: colors.primary, fontSize: 16 }}>Cancel</Text>
-            </TouchableOpacity>
-          ),
+          headerBackTitle: 'Back',
         }}
       />
-      <KeyboardAvoidingView
-        style={[styles.container, { backgroundColor: theme.colors.background }]}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-              Basic Information
-            </Text>
-            
-            <Text style={[styles.label, { color: theme.colors.text }]}>
-              Name
-            </Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: theme.colors.card, color: theme.colors.text, borderColor: theme.colors.border }]}
-              placeholder="Client's full name"
-              placeholderTextColor={colors.textSecondary}
-              value={name}
-              onChangeText={setName}
-            />
+      <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+        <View style={styles.section}>
+          <Text style={[styles.label, { color: theme.colors.text }]}>Name *</Text>
+          <TextInput
+            style={[
+              styles.input,
+              {
+                borderColor: theme.colors.border,
+                color: theme.colors.text,
+                backgroundColor: theme.colors.card,
+              },
+            ]}
+            value={name}
+            onChangeText={setName}
+            placeholder="Client name"
+            placeholderTextColor={theme.colors.text + '60'}
+          />
+        </View>
 
-            <Text style={[styles.label, { color: theme.colors.text }]}>
-              Age
-            </Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: theme.colors.card, color: theme.colors.text, borderColor: theme.colors.border }]}
-              placeholder="Age in years"
-              placeholderTextColor={colors.textSecondary}
-              value={age}
-              onChangeText={setAge}
-              keyboardType="number-pad"
-            />
+        <View style={styles.section}>
+          <Text style={[styles.label, { color: theme.colors.text }]}>Age *</Text>
+          <TextInput
+            style={[
+              styles.input,
+              {
+                borderColor: theme.colors.border,
+                color: theme.colors.text,
+                backgroundColor: theme.colors.card,
+              },
+            ]}
+            value={age}
+            onChangeText={setAge}
+            placeholder="Age"
+            keyboardType="number-pad"
+            placeholderTextColor={theme.colors.text + '60'}
+          />
+        </View>
 
-            <Text style={[styles.label, { color: theme.colors.text }]}>
-              Gender
-            </Text>
-            <View style={styles.optionsRow}>
-              {renderGenderOption('male', 'Male')}
-              {renderGenderOption('female', 'Female')}
-              {renderGenderOption('other', 'Other')}
-            </View>
-
-            <Text style={[styles.label, { color: theme.colors.text }]}>
-              Height (cm)
-            </Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: theme.colors.card, color: theme.colors.text, borderColor: theme.colors.border }]}
-              placeholder="Height in centimeters"
-              placeholderTextColor={colors.textSecondary}
-              value={height}
-              onChangeText={setHeight}
-              keyboardType="number-pad"
-            />
-
-            <Text style={[styles.label, { color: theme.colors.text }]}>
-              Weight (kg)
-            </Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: theme.colors.card, color: theme.colors.text, borderColor: theme.colors.border }]}
-              placeholder="Weight in kilograms"
-              placeholderTextColor={colors.textSecondary}
-              value={weight}
-              onChangeText={setWeight}
-              keyboardType="decimal-pad"
-            />
+        <View style={styles.section}>
+          <Text style={[styles.label, { color: theme.colors.text }]}>Gender</Text>
+          <View style={styles.optionsRow}>
+            {renderGenderOption('male', 'Male')}
+            {renderGenderOption('female', 'Female')}
+            {renderGenderOption('other', 'Other')}
           </View>
+        </View>
 
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-              Training Profile
-            </Text>
+        <View style={styles.section}>
+          <Text style={[styles.label, { color: theme.colors.text }]}>Height (cm)</Text>
+          <TextInput
+            style={[
+              styles.input,
+              {
+                borderColor: theme.colors.border,
+                color: theme.colors.text,
+                backgroundColor: theme.colors.card,
+              },
+            ]}
+            value={height}
+            onChangeText={setHeight}
+            placeholder="Height in cm"
+            keyboardType="decimal-pad"
+            placeholderTextColor={theme.colors.text + '60'}
+          />
+        </View>
 
-            <Text style={[styles.label, { color: theme.colors.text }]}>
-              Experience Level
-            </Text>
-            <View style={styles.optionsRow}>
-              {renderExperienceOption('beginner', 'Beginner')}
-              {renderExperienceOption('intermediate', 'Intermediate')}
-              {renderExperienceOption('advanced', 'Advanced')}
-            </View>
+        <View style={styles.section}>
+          <Text style={[styles.label, { color: theme.colors.text }]}>Weight (kg)</Text>
+          <TextInput
+            style={[
+              styles.input,
+              {
+                borderColor: theme.colors.border,
+                color: theme.colors.text,
+                backgroundColor: theme.colors.card,
+              },
+            ]}
+            value={weight}
+            onChangeText={setWeight}
+            placeholder="Weight in kg"
+            keyboardType="decimal-pad"
+            placeholderTextColor={theme.colors.text + '60'}
+          />
+        </View>
 
-            <Text style={[styles.label, { color: theme.colors.text }]}>
-              Primary Goal
-            </Text>
-            <View style={styles.optionsColumn}>
-              {renderGoalOption('fat_loss', 'Fat Loss')}
-              {renderGoalOption('hypertrophy', 'Muscle Growth')}
-              {renderGoalOption('strength', 'Strength')}
-              {renderGoalOption('rehab', 'Rehabilitation')}
-              {renderGoalOption('sport_specific', 'Sport Specific')}
-            </View>
-
-            <Text style={[styles.label, { color: theme.colors.text }]}>
-              Training Frequency (days/week)
-            </Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: theme.colors.card, color: theme.colors.text, borderColor: theme.colors.border }]}
-              placeholder="2-6 days per week"
-              placeholderTextColor={colors.textSecondary}
-              value={trainingFrequency}
-              onChangeText={setTrainingFrequency}
-              keyboardType="number-pad"
-            />
-
-            <Text style={[styles.label, { color: theme.colors.text }]}>
-              Available Equipment
-            </Text>
-            <View style={styles.optionsColumn}>
-              {renderEquipmentOption('commercial_gym', 'Commercial Gym')}
-              {renderEquipmentOption('home_gym', 'Home Gym')}
-              {renderEquipmentOption('dumbbells_only', 'Dumbbells Only')}
-              {renderEquipmentOption('bodyweight', 'Bodyweight')}
-            </View>
-
-            <Text style={[styles.label, { color: theme.colors.text }]}>
-              Time Per Session
-            </Text>
-            <View style={styles.optionsRow}>
-              {renderTimeOption('45', '45 min')}
-              {renderTimeOption('60', '60 min')}
-              {renderTimeOption('90', '90 min')}
-            </View>
-
-            <Text style={[styles.label, { color: theme.colors.text }]}>
-              Injuries or Limitations (Optional)
-            </Text>
-            <TextInput
-              style={[styles.textArea, { backgroundColor: theme.colors.card, color: theme.colors.text, borderColor: theme.colors.border }]}
-              placeholder="Any injuries, limitations, or exercises to avoid"
-              placeholderTextColor={colors.textSecondary}
-              value={injuries}
-              onChangeText={setInjuries}
-              multiline
-              numberOfLines={4}
-            />
+        <View style={styles.section}>
+          <Text style={[styles.label, { color: theme.colors.text }]}>Experience Level</Text>
+          <View style={styles.optionsRow}>
+            {renderExperienceOption('beginner', 'Beginner')}
+            {renderExperienceOption('intermediate', 'Intermediate')}
+            {renderExperienceOption('advanced', 'Advanced')}
           </View>
+        </View>
 
-          <TouchableOpacity
-            style={[styles.submitButton, loading && styles.submitButtonDisabled]}
-            onPress={handleSubmit}
-            disabled={loading}
-            activeOpacity={0.7}
-          >
-            {loading ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <>
-                <IconSymbol
-                  ios_icon_name="checkmark.circle.fill"
-                  android_material_icon_name="check-circle"
-                  size={20}
-                  color="#FFFFFF"
-                />
-                <Text style={styles.submitButtonText}>Create Client</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </ScrollView>
+        <View style={styles.section}>
+          <Text style={[styles.label, { color: theme.colors.text }]}>Primary Goal</Text>
+          <View style={styles.optionsRow}>
+            {renderGoalOption('fat_loss', 'Fat Loss')}
+            {renderGoalOption('hypertrophy', 'Muscle Growth')}
+            {renderGoalOption('strength', 'Strength')}
+            {renderGoalOption('rehab', 'Rehabilitation')}
+            {renderGoalOption('sport_specific', 'Sport Performance')}
+          </View>
+        </View>
 
-        <Modal
-          visible={errorModalVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setErrorModalVisible(false)}
+        <View style={styles.section}>
+          <Text style={[styles.label, { color: theme.colors.text }]}>Training Frequency (days/week)</Text>
+          <View style={styles.optionsRow}>
+            {['2', '3', '4', '5', '6'].map((freq) => {
+              const isSelected = trainingFrequency === freq;
+              const freqLabel = `${freq}x`;
+              return (
+                <TouchableOpacity
+                  key={freq}
+                  style={[
+                    styles.optionButton,
+                    {
+                      borderColor: isSelected ? colors.primary : theme.colors.border,
+                      backgroundColor: isSelected ? colors.primary + '20' : 'transparent',
+                    },
+                  ]}
+                  onPress={() => {
+                    setTrainingFrequency(freq);
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.optionText,
+                      { color: isSelected ? colors.primary : theme.colors.text },
+                    ]}
+                  >
+                    {freqLabel}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={[styles.label, { color: theme.colors.text }]}>Available Equipment</Text>
+          <View style={styles.optionsRow}>
+            {renderEquipmentOption('commercial_gym', 'Commercial Gym')}
+            {renderEquipmentOption('home_gym', 'Home Gym')}
+            {renderEquipmentOption('dumbbells_only', 'Dumbbells Only')}
+            {renderEquipmentOption('bodyweight', 'Bodyweight')}
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={[styles.label, { color: theme.colors.text }]}>Time Per Session (minutes)</Text>
+          <View style={styles.optionsRow}>
+            {renderTimeOption('45', '45 min')}
+            {renderTimeOption('60', '60 min')}
+            {renderTimeOption('90', '90 min')}
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={[styles.label, { color: theme.colors.text }]}>Injuries or Limitations</Text>
+          <TextInput
+            style={[
+              styles.input,
+              {
+                borderColor: theme.colors.border,
+                color: theme.colors.text,
+                backgroundColor: theme.colors.card,
+                minHeight: 80,
+              },
+            ]}
+            value={injuries}
+            onChangeText={setInjuries}
+            placeholder="Any injuries or limitations..."
+            multiline
+            placeholderTextColor={theme.colors.text + '60'}
+          />
+        </View>
+
+        <TouchableOpacity
+          style={[styles.submitButton, loading && { opacity: 0.6 }]}
+          onPress={handleSubmit}
+          disabled={loading}
         >
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { backgroundColor: theme.colors.card }]}>
-              <IconSymbol
-                ios_icon_name="exclamationmark.triangle.fill"
-                android_material_icon_name="error"
-                size={48}
-                color={colors.error}
-              />
-              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
-                Error
-              </Text>
-              <Text style={[styles.modalMessage, { color: colors.textSecondary }]}>
-                {errorMessage}
-              </Text>
-              <TouchableOpacity
-                style={styles.modalButton}
-                onPress={() => setErrorModalVisible(false)}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.modalButtonText}>OK</Text>
-              </TouchableOpacity>
-            </View>
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.submitButtonText}>Create Client</Text>
+          )}
+        </TouchableOpacity>
+      </ScrollView>
+
+      <Modal visible={showSuccessModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.colors.card }]}>
+            <IconSymbol
+              ios_icon_name="checkmark.circle.fill"
+              android_material_icon_name="check-circle"
+              size={64}
+              color={colors.success}
+            />
+            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Success!</Text>
+            <Text style={[styles.modalMessage, { color: theme.colors.text }]}>
+              Client created successfully
+            </Text>
           </View>
-        </Modal>
-      </KeyboardAvoidingView>
-    </>
+        </View>
+      </Modal>
+    </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 40,
-  },
-  section: {
-    marginBottom: 32,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
-    marginTop: 12,
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-  },
-  textArea: {
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    minHeight: 100,
-    textAlignVertical: 'top',
-  },
-  optionsRow: {
-    flexDirection: 'row',
-    gap: 8,
-    flexWrap: 'wrap',
-  },
-  optionsColumn: {
-    gap: 8,
-  },
-  optionButton: {
-    flex: 1,
-    minWidth: 100,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    alignItems: 'center',
-  },
-  optionText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  submitButton: {
-    backgroundColor: colors.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    borderRadius: 8,
-    marginTop: 16,
-    gap: 8,
-  },
-  submitButtonDisabled: {
-    opacity: 0.6,
-  },
-  submitButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modalContent: {
-    borderRadius: 12,
-    padding: 24,
-    width: '100%',
-    maxWidth: 400,
-    alignItems: 'center',
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginTop: 16,
-    marginBottom: 12,
-  },
-  modalMessage: {
-    fontSize: 16,
-    lineHeight: 24,
-    marginBottom: 24,
-    textAlign: 'center',
-  },
-  modalButton: {
-    backgroundColor: colors.primary,
-    paddingVertical: 12,
-    paddingHorizontal: 32,
-    borderRadius: 8,
-    width: '100%',
-    alignItems: 'center',
-  },
-  modalButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-});
